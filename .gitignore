@@ -15,3 +15,8 @@ npm-debug.log*
 *.deb
 *.rpm
 *.snap
+
+# IDE/Tool specific
+.claude/
+.specstory/
+image.png
