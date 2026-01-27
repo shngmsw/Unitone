@@ -23,6 +23,16 @@ contextBridge.exposeInMainWorld('unitone', {
     ipcRenderer.on('badge-updated', (event, data) => callback(data));
   },
 
+  // Geminiに送る
+  onSendToGemini: (callback) => {
+    ipcRenderer.on('send-to-gemini', (event, text) => callback(text));
+  },
+
+  // 認証完了
+  onAuthCompleted: (callback) => {
+    ipcRenderer.on('auth-completed', (event, url) => callback(url));
+  },
+
   // ウィンドウ操作（Windows用カスタムタイトルバー）
   windowMinimize: () => ipcRenderer.send('window-minimize'),
   windowMaximize: () => ipcRenderer.send('window-maximize'),
