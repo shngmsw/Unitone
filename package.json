@@ -70,8 +70,7 @@
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "assets/mac/entitlements.mac.plist",
-      "entitlementsInherit": "assets/mac/entitlements.mac.inherit.plist",
-      "notarize": true
+      "entitlementsInherit": "assets/mac/entitlements.mac.inherit.plist"
     },
     "win": {
       "icon": "assets/icons/icon.ico",
