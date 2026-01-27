@@ -6,6 +6,8 @@ class Unitone {
     this.activeServiceId = null;
     this.webviews = new Map();
     this.badges = new Map();
+    this.loadingTimer = null;
+    this.initialLoadDone = new Set();
 
     this.init();
   }
@@ -35,6 +37,16 @@ class Unitone {
     // バッジ更新をリッスン
     window.unitone.onBadgeUpdated(({ serviceId, count }) => {
       this.updateBadge(serviceId, count);
+    });
+
+    // Geminiに送るをリッスン
+    window.unitone.onSendToGemini((text) => {
+      this.sendToGemini(text);
+    });
+
+    // 認証完了時にアクティブなwebviewを認証後のURLにナビゲート
+    window.unitone.onAuthCompleted((url) => {
+      this.navigateActiveWebview(url);
     });
 
     // 初期サービスをアクティブに
@@ -74,22 +86,35 @@ class Unitone {
       webview.src = service.url;
       webview.partition = `persist:${service.id}`;
       webview.setAttribute('allowpopups', 'true');
-      webview.setAttribute('preload', '../preload/webview-preload.js');
+
+      // DOM準備完了時
+      webview.addEventListener('dom-ready', () => {
+        this.initialLoadDone.add(service.id);
+        if (this.activeServiceId === service.id) {
+          this.hideLoading();
+        }
+      });
 
       // 読み込み完了時
       webview.addEventListener('did-finish-load', () => {
-        this.hideLoading();
-        // サービスIDをwebviewに送信
-        webview.contentWindow.postMessage({
-          type: 'set-service-id',
-          serviceId: service.id
-        }, '*');
+        this.initialLoadDone.add(service.id);
+        if (this.activeServiceId === service.id) {
+          this.hideLoading();
+        }
       });
 
-      // 読み込み開始時
-      webview.addEventListener('did-start-loading', () => {
+      // 読み込み失敗時
+      webview.addEventListener('did-fail-load', (event) => {
         if (this.activeServiceId === service.id) {
-          this.showLoading();
+          this.hideLoading();
+        }
+        console.warn(`Failed to load ${service.name}:`, event.errorDescription);
+      });
+
+      // 読み込み開始時（初回のみ、遅延表示）
+      webview.addEventListener('did-start-loading', () => {
+        if (this.activeServiceId === service.id && !this.initialLoadDone.has(service.id)) {
+          this.showLoadingDelayed();
         }
       });
 
@@ -168,6 +193,73 @@ class Unitone {
     }
   }
 
+  reloadActiveWebview() {
+    const webview = this.webviews.get(this.activeServiceId);
+    if (webview) {
+      webview.reload();
+    }
+  }
+
+  navigateActiveWebview(url) {
+    const webview = this.webviews.get(this.activeServiceId);
+    if (webview && url) {
+      webview.src = url;
+    } else if (webview) {
+      webview.reload();
+    }
+  }
+
+  sendToGemini(text) {
+    // AIコンパニオンを表示
+    const aiCompanion = document.getElementById('ai-companion');
+    if (aiCompanion.classList.contains('hidden')) {
+      this.toggleAiCompanion();
+    }
+
+    const aiWebview = document.getElementById('ai-webview');
+
+    // Geminiが読み込まれるのを待ってからテキストを入力
+    const tryInsertText = () => {
+      // Geminiの入力欄にテキストを挿入するスクリプト
+      aiWebview.executeJavaScript(`
+        (function() {
+          // Geminiの入力欄を探す
+          const textareas = document.querySelectorAll('textarea, [contenteditable="true"], .ql-editor, [role="textbox"]');
+          for (const el of textareas) {
+            if (el.offsetParent !== null) { // 可視要素のみ
+              if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
+                el.value = ${JSON.stringify(text)};
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+              } else {
+                el.textContent = ${JSON.stringify(text)};
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+              }
+              el.focus();
+              return true;
+            }
+          }
+          return false;
+        })();
+      `).then(result => {
+        if (!result) {
+          console.log('Geminiの入力欄が見つかりませんでした。クリップボードにコピーしました。');
+          // フォールバック：クリップボードにコピー
+          navigator.clipboard.writeText(text);
+        }
+      }).catch(err => {
+        console.error('Geminiへの送信に失敗:', err);
+        navigator.clipboard.writeText(text);
+      });
+    };
+
+    // webviewが読み込み済みならすぐ実行、そうでなければ待つ
+    if (aiWebview.src !== 'about:blank') {
+      tryInsertText();
+    } else {
+      aiWebview.addEventListener('dom-ready', tryInsertText, { once: true });
+    }
+  }
+
   updateBadge(serviceId, count) {
     this.badges.set(serviceId, count);
     const item = document.querySelector(`.service-item[data-service-id="${serviceId}"]`);
@@ -186,7 +278,23 @@ class Unitone {
     document.getElementById('loading-indicator').classList.remove('hidden');
   }
 
+  showLoadingDelayed() {
+    // 既存のタイマーをクリア
+    if (this.loadingTimer) {
+      clearTimeout(this.loadingTimer);
+    }
+    // 500ms後にまだ読み込み中ならローディング表示
+    this.loadingTimer = setTimeout(() => {
+      this.showLoading();
+    }, 500);
+  }
+
   hideLoading() {
+    // タイマーをクリア
+    if (this.loadingTimer) {
+      clearTimeout(this.loadingTimer);
+      this.loadingTimer = null;
+    }
     document.getElementById('loading-indicator').classList.add('hidden');
   }
 
@@ -215,6 +323,36 @@ class Unitone {
 
       document.getElementById('add-service-modal').classList.add('hidden');
       document.getElementById('add-service-form').reset();
+    });
+
+    // サービス編集キャンセル
+    document.getElementById('cancel-edit-btn').addEventListener('click', () => {
+      document.getElementById('edit-service-modal').classList.add('hidden');
+    });
+
+    // サービス編集フォーム送信
+    document.getElementById('edit-service-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('edit-service-id').value;
+      const name = document.getElementById('edit-service-name').value;
+      const url = document.getElementById('edit-service-url').value;
+      const icon = document.getElementById('edit-service-icon').value || '🔗';
+
+      const service = this.services.find(s => s.id === id);
+      if (service) {
+        const updatedService = { ...service, name, url, icon };
+        this.services = await window.unitone.updateService(updatedService);
+        this.renderServiceDock();
+        this.createWebViews();
+
+        // 編集したサービスがアクティブなら再読み込み
+        if (this.activeServiceId === id) {
+          this.switchService(id);
+        }
+      }
+
+      document.getElementById('edit-service-modal').classList.add('hidden');
+      this.openSettings(); // 設定リストを更新
     });
 
     // AIコンパニオン切り替え
@@ -281,9 +419,20 @@ class Unitone {
             <div class="service-url">${service.url}</div>
           </div>
         </div>
-        <button class="delete-btn" data-service-id="${service.id}" title="削除">🗑</button>
+        <div class="service-actions">
+          <button class="edit-btn" data-service-id="${service.id}" title="編集">✏️</button>
+          <button class="delete-btn" data-service-id="${service.id}" title="削除">🗑️</button>
+        </div>
       `;
       list.appendChild(item);
+    });
+
+    // 編集ボタンのイベント
+    list.querySelectorAll('.edit-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const serviceId = btn.dataset.serviceId;
+        this.openEditService(serviceId);
+      });
     });
 
     // 削除ボタンのイベント
@@ -306,6 +455,18 @@ class Unitone {
     });
 
     document.getElementById('settings-modal').classList.remove('hidden');
+  }
+
+  openEditService(serviceId) {
+    const service = this.services.find(s => s.id === serviceId);
+    if (!service) return;
+
+    document.getElementById('edit-service-id').value = service.id;
+    document.getElementById('edit-service-name').value = service.name;
+    document.getElementById('edit-service-url').value = service.url;
+    document.getElementById('edit-service-icon').value = service.icon;
+
+    document.getElementById('edit-service-modal').classList.remove('hidden');
   }
 }
 

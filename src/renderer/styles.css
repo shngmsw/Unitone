@@ -530,7 +530,12 @@ body.platform-linux #service-dock {
   white-space: nowrap;
 }
 
-/* SHIG #15 エラーを回避する - 削除は控えめに */
+.service-setting-item .service-actions {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.service-setting-item .edit-btn,
 .service-setting-item .delete-btn {
   background: none;
   border: none;
@@ -545,6 +550,11 @@ body.platform-linux #service-dock {
   justify-content: center;
   transition: background-color var(--transition-fast),
               color var(--transition-fast);
+}
+
+.service-setting-item .edit-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
 }
 
 .service-setting-item .delete-btn:hover {

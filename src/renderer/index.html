@@ -69,10 +69,35 @@
     <div class="modal-content">
       <h2>設定</h2>
       <div id="service-settings-list"></div>
-      <!-- SHIG #47 具体的な動詞 -->
       <div class="form-actions">
         <button id="close-settings-btn">設定を閉じる</button>
       </div>
+    </div>
+  </div>
+
+  <!-- サービス編集モーダル -->
+  <div id="edit-service-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2>サービスを編集</h2>
+      <form id="edit-service-form">
+        <input type="hidden" id="edit-service-id">
+        <div class="form-group">
+          <label for="edit-service-name">名前</label>
+          <input type="text" id="edit-service-name" required>
+        </div>
+        <div class="form-group">
+          <label for="edit-service-url">URL</label>
+          <input type="url" id="edit-service-url" required placeholder="https://app.slack.com/client/XXXXX/XXXXX">
+        </div>
+        <div class="form-group">
+          <label for="edit-service-icon">アイコン（絵文字）</label>
+          <input type="text" id="edit-service-icon" maxlength="2">
+        </div>
+        <div class="form-actions">
+          <button type="button" id="cancel-edit-btn">キャンセル</button>
+          <button type="submit">保存</button>
+        </div>
+      </form>
     </div>
   </div>
 
