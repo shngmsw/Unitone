@@ -80,15 +80,30 @@ html, body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: var(--space-sm);
-  padding-top: var(--space-lg); /* タイトルバーボタン用スペース */
+  gap: 8px;
+  padding-top: 24px; /* タイトルバーボタン用スペース (macOS) */
   -webkit-app-region: no-drag;
 }
 
-/* SHIG #4 シグニファイア - 押せそうに見せる */
-/* SHIG #78 タッチ操作要素は7mm以上 */
-/* SHIG #93 ホットスポットを広げる */
+/* Windows: タイトルバーオーバーレイ分のスペースを確保 */
+body.platform-win32 #service-list {
+  padding-top: 32px;
+}
+
+/* Windows: ドラッグ領域を上部に設定 */
+body.platform-win32 #service-dock {
+  padding-top: 32px;
+}
+
+/* Linux: 標準フレームなのでパディング不要 */
+body.platform-linux #service-list {
+  padding-top: 8px;
+}
+
+body.platform-linux #service-dock {
+  padding-top: 8px;
+}
+
 .service-item {
   width: var(--btn-size-lg);
   height: var(--btn-size-lg);

@@ -21,5 +21,14 @@ contextBridge.exposeInMainWorld('unitone', {
   updateBadge: (serviceId, count) => ipcRenderer.send('update-badge', { serviceId, count }),
   onBadgeUpdated: (callback) => {
     ipcRenderer.on('badge-updated', (event, data) => callback(data));
-  }
+  },
+
+  // ウィンドウ操作（Windows用カスタムタイトルバー）
+  windowMinimize: () => ipcRenderer.send('window-minimize'),
+  windowMaximize: () => ipcRenderer.send('window-maximize'),
+  windowClose: () => ipcRenderer.send('window-close'),
+  windowIsMaximized: () => ipcRenderer.invoke('window-is-maximized'),
+
+  // プラットフォーム情報
+  getPlatform: () => ipcRenderer.invoke('get-platform')
 });

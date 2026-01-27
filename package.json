@@ -5,7 +5,12 @@
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron . --dev"
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "build:all": "electron-builder -mwl"
   },
   "keywords": [
     "chat",
@@ -18,9 +23,71 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^33.0.0"
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
   },
   "dependencies": {
     "electron-store": "^10.0.0"
+  },
+  "build": {
+    "appId": "com.unitone.app",
+    "productName": "Unitone",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "assets/icons/icon.icns",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
+    },
+    "win": {
+      "icon": "assets/icons/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64", "ia32"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "assets/icons/icon.ico",
+      "uninstallerIcon": "assets/icons/icon.ico",
+      "installerHeaderIcon": "assets/icons/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Unitone"
+    },
+    "linux": {
+      "icon": "assets/icons",
+      "category": "Network;InstantMessaging",
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm"
+      ]
+    }
   }
 }
