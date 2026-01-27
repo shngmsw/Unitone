@@ -31,6 +31,34 @@ jobs:
         run: npm ci
 
       - name: Run semantic-release
+        id: semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx semantic-release
+        run: |
+          # semantic-releaseの出力をキャプチャ
+          npx semantic-release 2>&1 | tee release-output.txt
+
+          # リリースが作成されたか確認（新しいバージョンが公開された場合）
+          if grep -q "Published release" release-output.txt; then
+            echo "release_created=true" >> $GITHUB_OUTPUT
+          else
+            echo "release_created=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get latest tag
+        id: get-tag
+        if: steps.semantic-release.outputs.release_created == 'true'
+        run: |
+          # 最新のタグを取得
+          git fetch --tags
+          LATEST_TAG=$(git describe --tags --abbrev=0)
+          echo "tag_name=$LATEST_TAG" >> $GITHUB_OUTPUT
+          echo "Latest tag: $LATEST_TAG"
+
+      - name: Trigger Release Build workflow
+        if: steps.semantic-release.outputs.release_created == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run release.yml \
+            --field tag_name=${{ steps.get-tag.outputs.tag_name }}
