@@ -68,8 +68,11 @@
         }
       ],
       "hardenedRuntime": true,
-      "gatekeeperAssess": false
+      "gatekeeperAssess": false,
+      "entitlements": "assets/mac/entitlements.mac.plist",
+      "entitlementsInherit": "assets/mac/entitlements.mac.inherit.plist"
     },
+    "afterSign": "scripts/notarize.js",
     "win": {
       "icon": "assets/icons/icon.ico",
       "target": [
