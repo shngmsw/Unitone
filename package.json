@@ -26,7 +26,16 @@
     "electron": "^33.0.0",
     "electron-builder": "^25.0.0",
     "png-to-ico": "^3.0.1",
+    "semantic-release": "^24.0.0",
     "sharp": "^0.34.5"
+  },
+  "release": {
+    "branches": ["main"],
+    "plugins": [
+      "@semantic-release/commit-analyzer",
+      "@semantic-release/release-notes-generator",
+      "@semantic-release/github"
+    ]
   },
   "build": {
     "appId": "com.unitone.app",
@@ -41,7 +50,7 @@
     ],
     "mac": {
       "category": "public.app-category.productivity",
-      "icon": "assets/icons/icon.icns",
+      "icon": "assets/icons/512x512.png",
       "target": [
         {
           "target": "dmg",
