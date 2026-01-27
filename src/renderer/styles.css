@@ -48,8 +48,27 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding-top: 24px; /* タイトルバーボタン用スペース */
+  padding-top: 24px; /* タイトルバーボタン用スペース (macOS) */
   -webkit-app-region: no-drag;
+}
+
+/* Windows: タイトルバーオーバーレイ分のスペースを確保 */
+body.platform-win32 #service-list {
+  padding-top: 32px;
+}
+
+/* Windows: ドラッグ領域を上部に設定 */
+body.platform-win32 #service-dock {
+  padding-top: 32px;
+}
+
+/* Linux: 標準フレームなのでパディング不要 */
+body.platform-linux #service-list {
+  padding-top: 8px;
+}
+
+body.platform-linux #service-dock {
+  padding-top: 8px;
 }
 
 .service-item {

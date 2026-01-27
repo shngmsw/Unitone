@@ -1,6 +1,11 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, session } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, session, shell } = require('electron');
 const path = require('path');
 const Store = require('electron-store');
+
+// プラットフォーム判定
+const isMac = process.platform === 'darwin';
+const isWindows = process.platform === 'win32';
+const isLinux = process.platform === 'linux';
 
 // 設定ストア
 const store = new Store({
@@ -24,7 +29,8 @@ let tray = null;
 function createWindow() {
   const bounds = store.get('windowBounds');
 
-  mainWindow = new BrowserWindow({
+  // プラットフォームごとのウィンドウ設定
+  const windowOptions = {
     width: bounds.width,
     height: bounds.height,
     x: bounds.x,
@@ -37,9 +43,41 @@ function createWindow() {
       nodeIntegration: false,
       webviewTag: true
     },
-    titleBarStyle: 'hiddenInset',
-    frame: process.platform !== 'darwin',
-    icon: path.join(__dirname, '../../assets/icons/icon.png')
+    show: false, // ready-to-showで表示
+    backgroundColor: '#1a1a2e'
+  };
+
+  // macOS: ネイティブのタイトルバーを使用（hiddenInset）
+  if (isMac) {
+    windowOptions.titleBarStyle = 'hiddenInset';
+    windowOptions.trafficLightPosition = { x: 12, y: 12 };
+  }
+  // Windows: フレームレスウィンドウでカスタムタイトルバーを使用
+  else if (isWindows) {
+    windowOptions.frame = false;
+    windowOptions.titleBarStyle = 'hidden';
+    windowOptions.titleBarOverlay = {
+      color: '#16213e',
+      symbolColor: '#eeeeee',
+      height: 32
+    };
+  }
+  // Linux: 標準フレームを使用
+  else {
+    windowOptions.frame = true;
+  }
+
+  // アイコン設定（存在する場合のみ）
+  const iconPath = isWindows
+    ? path.join(__dirname, '../../assets/icons/icon.ico')
+    : path.join(__dirname, '../../assets/icons/icon.png');
+  windowOptions.icon = iconPath;
+
+  mainWindow = new BrowserWindow(windowOptions);
+
+  // ウィンドウ準備完了後に表示
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
   });
 
   mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
@@ -60,8 +98,17 @@ function createWindow() {
 }
 
 function createTray() {
-  // シンプルなトレイアイコン（16x16の空画像）
-  const icon = nativeImage.createEmpty();
+  // プラットフォームに応じたトレイアイコンを作成
+  let icon;
+
+  // Windows: 16x16のアイコンを使用
+  if (isWindows) {
+    icon = createTrayIcon();
+  } else {
+    // macOS/Linux: 空のアイコンまたはテンプレートアイコン
+    icon = nativeImage.createEmpty();
+  }
+
   tray = new Tray(icon);
 
   const contextMenu = Menu.buildFromTemplate([
@@ -83,19 +130,74 @@ function createTray() {
     }
   ]);
 
-  tray.setToolTip('Unitone');
+  tray.setToolTip('Unitone - チャット統合アプリ');
   tray.setContextMenu(contextMenu);
 
+  // Windows: シングルクリックでウィンドウ表示
+  // macOS: コンテキストメニュー表示がデフォルト
   tray.on('click', () => {
     if (mainWindow) {
-      if (mainWindow.isVisible()) {
-        mainWindow.hide();
-      } else {
+      if (isWindows) {
+        // Windowsではシングルクリックで表示/フォーカス
         mainWindow.show();
         mainWindow.focus();
+      } else {
+        // macOS/Linuxではトグル
+        if (mainWindow.isVisible()) {
+          mainWindow.hide();
+        } else {
+          mainWindow.show();
+          mainWindow.focus();
+        }
       }
     }
   });
+
+  // Windows: ダブルクリックでもウィンドウ表示
+  if (isWindows) {
+    tray.on('double-click', () => {
+      if (mainWindow) {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    });
+  }
+}
+
+// トレイアイコン生成
+function createTrayIcon() {
+  const size = 16;
+  const data = Buffer.alloc(size * size * 4);
+
+  // シンプルな「U」のアイコンを描画
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const idx = (y * size + x) * 4;
+      const inU = (
+        // 左の縦線
+        (x >= 3 && x <= 5 && y >= 2 && y <= 11) ||
+        // 右の縦線
+        (x >= 10 && x <= 12 && y >= 2 && y <= 11) ||
+        // 下の曲線
+        (y >= 10 && y <= 13 && x >= 3 && x <= 12 &&
+          Math.sqrt(Math.pow(x - 7.5, 2) + Math.pow(y - 10, 2)) <= 5)
+      );
+
+      if (inU) {
+        data[idx] = 233;     // R (accent color)
+        data[idx + 1] = 69;  // G
+        data[idx + 2] = 96;  // B
+        data[idx + 3] = 255; // A
+      } else {
+        data[idx] = 0;
+        data[idx + 1] = 0;
+        data[idx + 2] = 0;
+        data[idx + 3] = 0;
+      }
+    }
+  }
+
+  return nativeImage.createFromBuffer(data, { width: size, height: size });
 }
 
 // IPC ハンドラー
@@ -154,16 +256,98 @@ ipcMain.handle('set-show-ai-companion', (event, show) => {
 });
 
 // 通知バッジ更新
+let totalBadgeCount = 0;
+const serviceBadgeCounts = {};
+
 ipcMain.on('update-badge', (event, { serviceId, count }) => {
   if (mainWindow) {
     mainWindow.webContents.send('badge-updated', { serviceId, count });
   }
 
-  // macOSの場合はドックバッジも更新
-  if (process.platform === 'darwin') {
-    const totalCount = count > 0 ? count.toString() : '';
-    app.dock.setBadge(totalCount);
+  // バッジカウントを更新
+  serviceBadgeCounts[serviceId] = count;
+  totalBadgeCount = Object.values(serviceBadgeCounts).reduce((sum, c) => sum + c, 0);
+
+  // macOS: ドックバッジを更新
+  if (isMac) {
+    app.dock.setBadge(totalBadgeCount > 0 ? totalBadgeCount.toString() : '');
   }
+  // Windows: タスクバーオーバーレイアイコンを更新
+  else if (isWindows && mainWindow) {
+    if (totalBadgeCount > 0) {
+      // バッジ付きオーバーレイアイコンを作成
+      const badgeIcon = createBadgeIcon(totalBadgeCount);
+      mainWindow.setOverlayIcon(badgeIcon, `${totalBadgeCount} 件の通知`);
+    } else {
+      mainWindow.setOverlayIcon(null, '');
+    }
+  }
+});
+
+// Windows用バッジアイコン生成
+function createBadgeIcon(count) {
+  // 16x16のバッジアイコンを作成
+  const canvas = require('electron').nativeImage.createFromBuffer(
+    Buffer.alloc(16 * 16 * 4, 0)
+  );
+
+  // シンプルな赤い丸のアイコンを作成（実際は画像ファイルを使用推奨）
+  const size = 16;
+  const data = Buffer.alloc(size * size * 4);
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const idx = (y * size + x) * 4;
+      const cx = x - size / 2;
+      const cy = y - size / 2;
+      const dist = Math.sqrt(cx * cx + cy * cy);
+
+      if (dist < size / 2 - 1) {
+        // 赤い円
+        data[idx] = 233;     // R
+        data[idx + 1] = 69;  // G
+        data[idx + 2] = 96;  // B
+        data[idx + 3] = 255; // A
+      } else if (dist < size / 2) {
+        // アンチエイリアス
+        const alpha = Math.max(0, 1 - (dist - (size / 2 - 1)));
+        data[idx] = 233;
+        data[idx + 1] = 69;
+        data[idx + 2] = 96;
+        data[idx + 3] = Math.round(alpha * 255);
+      }
+    }
+  }
+
+  return nativeImage.createFromBuffer(data, { width: size, height: size });
+}
+
+// ウィンドウ操作IPC（Windows用カスタムタイトルバー）
+ipcMain.on('window-minimize', () => {
+  if (mainWindow) mainWindow.minimize();
+});
+
+ipcMain.on('window-maximize', () => {
+  if (mainWindow) {
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+  }
+});
+
+ipcMain.on('window-close', () => {
+  if (mainWindow) mainWindow.close();
+});
+
+ipcMain.handle('window-is-maximized', () => {
+  return mainWindow ? mainWindow.isMaximized() : false;
+});
+
+// プラットフォーム情報を送信
+ipcMain.handle('get-platform', () => {
+  return process.platform;
 });
 
 // アプリ起動
@@ -181,7 +365,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
+  if (!isMac) {
     app.quit();
   }
 });

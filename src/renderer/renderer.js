@@ -11,6 +11,10 @@ class Unitone {
   }
 
   async init() {
+    // プラットフォーム判定してbodyにクラスを追加
+    const platform = await window.unitone.getPlatform();
+    document.body.classList.add(`platform-${platform}`);
+
     // 設定を読み込み
     this.services = await window.unitone.getServices();
     this.activeServiceId = await window.unitone.getActiveService();
