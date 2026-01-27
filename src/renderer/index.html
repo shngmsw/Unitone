@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';">
+  <title>Unitone</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- L1: サービスドック -->
+    <aside id="service-dock">
+      <div id="service-list"></div>
+      <div id="dock-actions">
+        <button id="add-service-btn" class="dock-btn" title="サービスを追加">+</button>
+        <button id="toggle-ai-btn" class="dock-btn" title="AIコンパニオンを切り替え">AI</button>
+        <button id="settings-btn" class="dock-btn" title="設定">⚙</button>
+      </div>
+    </aside>
+
+    <!-- L2: メインキャンバス -->
+    <main id="main-canvas">
+      <div id="webview-container"></div>
+      <div id="loading-indicator">
+        <div class="spinner"></div>
+        <span>読み込み中...</span>
+      </div>
+    </main>
+
+    <!-- L3: AIコンパニオン -->
+    <aside id="ai-companion" class="hidden">
+      <div id="ai-header">
+        <span>Gemini</span>
+        <button id="close-ai-btn" title="閉じる">×</button>
+      </div>
+      <webview id="ai-webview" src="about:blank" partition="persist:gemini"></webview>
+    </aside>
+  </div>
+
+  <!-- サービス追加モーダル -->
+  <div id="add-service-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2>サービスを追加</h2>
+      <form id="add-service-form">
+        <div class="form-group">
+          <label for="service-name">名前</label>
+          <input type="text" id="service-name" required placeholder="例: Discord">
+        </div>
+        <div class="form-group">
+          <label for="service-url">URL</label>
+          <input type="url" id="service-url" required placeholder="https://discord.com/app">
+        </div>
+        <div class="form-group">
+          <label for="service-icon">アイコン（絵文字）</label>
+          <input type="text" id="service-icon" placeholder="例: 🎮" maxlength="2">
+        </div>
+        <div class="form-actions">
+          <button type="button" id="cancel-add-btn">キャンセル</button>
+          <button type="submit">追加</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 設定モーダル -->
+  <div id="settings-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2>設定</h2>
+      <div id="service-settings-list"></div>
+      <div class="form-actions">
+        <button id="close-settings-btn">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

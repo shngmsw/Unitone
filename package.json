@@ -1,0 +1,26 @@
+{
+  "name": "unitone",
+  "version": "1.0.0",
+  "description": "複数のチャットツールを1つにまとめるデスクトップアプリ",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev"
+  },
+  "keywords": [
+    "chat",
+    "electron",
+    "slack",
+    "teams",
+    "google-chat",
+    "chatwork"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.0.0"
+  },
+  "dependencies": {
+    "electron-store": "^10.0.0"
+  }
+}

@@ -1,0 +1,371 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --dock-width: 60px;
+  --ai-width: 400px;
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #16213e;
+  --bg-tertiary: #0f3460;
+  --text-primary: #eee;
+  --text-secondary: #aaa;
+  --accent: #e94560;
+  --accent-hover: #ff6b6b;
+  --border-color: #333;
+}
+
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+#app {
+  display: flex;
+  height: 100%;
+  /* macOSのタイトルバー用にドラッグ領域を確保 */
+  -webkit-app-region: no-drag;
+}
+
+/* L1: サービスドック */
+#service-dock {
+  width: var(--dock-width);
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  border-right: 1px solid var(--border-color);
+  -webkit-app-region: drag;
+}
+
+#service-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 24px; /* タイトルバーボタン用スペース */
+  -webkit-app-region: no-drag;
+}
+
+.service-item {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  font-size: 20px;
+  border: 2px solid transparent;
+}
+
+.service-item:hover {
+  background: var(--accent);
+  transform: scale(1.05);
+}
+
+.service-item.active {
+  border-color: var(--accent);
+  background: var(--bg-tertiary);
+}
+
+.service-item .badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: var(--accent);
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+
+.service-item .badge.hidden {
+  display: none;
+}
+
+#dock-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color);
+  -webkit-app-region: no-drag;
+}
+
+.dock-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--bg-tertiary);
+  border: none;
+  color: var(--text-primary);
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dock-btn:hover {
+  background: var(--accent);
+}
+
+/* L2: メインキャンバス */
+#main-canvas {
+  flex: 1;
+  position: relative;
+  background: var(--bg-primary);
+}
+
+#webview-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+#webview-container webview {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+#webview-container webview.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#loading-indicator {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-secondary);
+}
+
+#loading-indicator.hidden {
+  display: none;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* L3: AIコンパニオン */
+#ai-companion {
+  width: var(--ai-width);
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s ease, opacity 0.3s ease;
+}
+
+#ai-companion.hidden {
+  width: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+#ai-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-tertiary);
+  font-weight: 600;
+  -webkit-app-region: drag;
+}
+
+#ai-header button {
+  -webkit-app-region: no-drag;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+#ai-header button:hover {
+  color: var(--text-primary);
+}
+
+#ai-webview {
+  flex: 1;
+  border: none;
+}
+
+/* モーダル */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-content {
+  background: var(--bg-secondary);
+  padding: 24px;
+  border-radius: 12px;
+  min-width: 400px;
+  max-width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-content h2 {
+  margin-bottom: 20px;
+  color: var(--text-primary);
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.form-actions button {
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.form-actions button[type="button"],
+.form-actions button:not([type="submit"]) {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.form-actions button[type="submit"],
+.form-actions button:only-child {
+  background: var(--accent);
+  color: white;
+}
+
+.form-actions button:hover {
+  opacity: 0.8;
+}
+
+/* 設定リスト */
+#service-settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.service-setting-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: var(--bg-primary);
+  border-radius: 8px;
+}
+
+.service-setting-item .service-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.service-setting-item .service-icon {
+  font-size: 24px;
+}
+
+.service-setting-item .service-name {
+  font-weight: 500;
+}
+
+.service-setting-item .service-url {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.service-setting-item .delete-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 18px;
+  padding: 4px 8px;
+}
+
+.service-setting-item .delete-btn:hover {
+  color: var(--accent-hover);
+}
+
+/* ツールチップ */
+[title] {
+  position: relative;
+}
