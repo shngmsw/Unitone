@@ -4,7 +4,9 @@
 (function() {
   // document.titleの変更を監視して通知数を検出
   let lastTitle = document.title;
+  let lastCount = 0;
   let serviceId = null;
+  let debounceTimer = null;
 
   // 通知数を抽出する正規表現パターン
   const patterns = [
@@ -25,6 +27,10 @@
   }
 
   function notifyParent(count) {
+    // 同じカウントなら通知しない（CPU最適化）
+    if (count === lastCount) return;
+    lastCount = count;
+
     window.parent.postMessage({
       type: 'notification-count',
       serviceId: serviceId,
@@ -32,29 +38,43 @@
     }, '*');
   }
 
-  // タイトル変更の監視
-  const titleObserver = new MutationObserver(() => {
-    if (document.title !== lastTitle) {
-      lastTitle = document.title;
-      const count = extractNotificationCount(lastTitle);
-      notifyParent(count);
+  // デバウンス付きタイトル変更ハンドラ（Apple Silicon最適化）
+  function handleTitleChange() {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
     }
-  });
+    // 100msのデバウンスでCPU負荷を軽減
+    debounceTimer = setTimeout(() => {
+      if (document.title !== lastTitle) {
+        lastTitle = document.title;
+        const count = extractNotificationCount(lastTitle);
+        notifyParent(count);
+      }
+    }, 100);
+  }
+
+  // タイトル変更の監視
+  const titleObserver = new MutationObserver(handleTitleChange);
 
   // head要素のtitle変更を監視
   function startObserving() {
     const titleElement = document.querySelector('title');
     if (titleElement) {
+      // Apple Silicon最適化: subtreeを削除して軽量化
       titleObserver.observe(titleElement, {
         childList: true,
-        characterData: true,
-        subtree: true
+        characterData: true
       });
     }
 
     // 初回チェック
     const count = extractNotificationCount(document.title);
-    notifyParent(count);
+    lastCount = count;
+    window.parent.postMessage({
+      type: 'notification-count',
+      serviceId: serviceId,
+      count: count
+    }, '*');
   }
 
   // サービスIDを受け取る

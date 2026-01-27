@@ -147,9 +147,21 @@ class Unitone {
       item.classList.remove('active');
     });
 
-    // webviewの表示を切り替え
+    // webviewの表示を切り替え（CPU最適化: 非アクティブなWebViewをスロットル）
     this.webviews.forEach((webview, id) => {
-      webview.classList.toggle('active', id === serviceId);
+      const isActive = id === serviceId;
+      webview.classList.toggle('active', isActive);
+
+      // 非アクティブなWebViewのバックグラウンド処理を抑制
+      if (isActive) {
+        // アクティブ: オーディオ有効、表示
+        webview.setAudioMuted(false);
+        webview.style.visibility = 'visible';
+      } else {
+        // 非アクティブ: オーディオミュート、非表示（レンダリング停止）
+        webview.setAudioMuted(true);
+        webview.style.visibility = 'hidden';
+      }
     });
 
     // アクティブなサービスを更新

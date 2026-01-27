@@ -41,7 +41,9 @@ function createWindow() {
       preload: path.join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      webviewTag: true
+      webviewTag: true,
+      // Apple Silicon最適化: バックグラウンドスロットリング有効
+      backgroundThrottling: true
     },
     show: false, // ready-to-showで表示
     backgroundColor: '#1a1a2e'
@@ -258,6 +260,8 @@ ipcMain.handle('set-show-ai-companion', (event, show) => {
 // 通知バッジ更新
 let totalBadgeCount = 0;
 const serviceBadgeCounts = {};
+// バッジアイコンキャッシュ（Apple Silicon最適化）
+const badgeIconCache = new Map();
 
 ipcMain.on('update-badge', (event, { serviceId, count }) => {
   if (mainWindow) {
@@ -284,42 +288,49 @@ ipcMain.on('update-badge', (event, { serviceId, count }) => {
   }
 });
 
-// Windows用バッジアイコン生成
+// Windows用バッジアイコン生成（キャッシュ対応）
 function createBadgeIcon(count) {
-  // 16x16のバッジアイコンを作成
-  const canvas = require('electron').nativeImage.createFromBuffer(
-    Buffer.alloc(16 * 16 * 4, 0)
-  );
+  // キャッシュから取得（Apple Silicon最適化: 毎回の計算を回避）
+  // バッジは赤い丸なので、カウント値に関係なく同じアイコンをキャッシュ
+  const cacheKey = 'badge';
+  if (badgeIconCache.has(cacheKey)) {
+    return badgeIconCache.get(cacheKey);
+  }
 
-  // シンプルな赤い丸のアイコンを作成（実際は画像ファイルを使用推奨）
+  // シンプルな赤い丸のアイコンを作成
   const size = 16;
   const data = Buffer.alloc(size * size * 4);
+  const radius = size / 2;
+  const radiusInner = radius - 1;
 
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const idx = (y * size + x) * 4;
-      const cx = x - size / 2;
-      const cy = y - size / 2;
-      const dist = Math.sqrt(cx * cx + cy * cy);
+      const cx = x - radius;
+      const cy = y - radius;
+      const distSq = cx * cx + cy * cy; // Math.sqrt を回避
+      const radiusInnerSq = radiusInner * radiusInner;
+      const radiusSq = radius * radius;
 
-      if (dist < size / 2 - 1) {
+      if (distSq < radiusInnerSq) {
         // 赤い円
         data[idx] = 233;     // R
         data[idx + 1] = 69;  // G
         data[idx + 2] = 96;  // B
         data[idx + 3] = 255; // A
-      } else if (dist < size / 2) {
-        // アンチエイリアス
-        const alpha = Math.max(0, 1 - (dist - (size / 2 - 1)));
+      } else if (distSq < radiusSq) {
+        // アンチエイリアス（簡略化）
         data[idx] = 233;
         data[idx + 1] = 69;
         data[idx + 2] = 96;
-        data[idx + 3] = Math.round(alpha * 255);
+        data[idx + 3] = 180; // 半透明
       }
     }
   }
 
-  return nativeImage.createFromBuffer(data, { width: size, height: size });
+  const icon = nativeImage.createFromBuffer(data, { width: size, height: size });
+  badgeIconCache.set(cacheKey, icon);
+  return icon;
 }
 
 // ウィンドウ操作IPC（Windows用カスタムタイトルバー）
