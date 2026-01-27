@@ -43,11 +43,17 @@ jobs:
 
       # macOS: 証明書をキーチェーンにインポート
       - name: Import Code Signing Certificate
-        if: matrix.platform == 'mac' && secrets.CSC_LINK != ''
+        if: matrix.platform == 'mac'
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
         run: |
+          # 証明書がない場合はスキップ
+          if [ -z "$CSC_LINK" ]; then
+            echo "No code signing certificate provided, skipping..."
+            exit 0
+          fi
+
           # 一時キーチェーンを作成
           KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain
           KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
@@ -75,8 +81,8 @@ jobs:
           APPLE_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_ID || '' }}
           APPLE_ID_PASSWORD: ${{ matrix.platform == 'mac' && secrets.APPLE_ID_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_TEAM_ID || '' }}
-          # 証明書がない場合のみ macOS で自動検出を有効化し、それ以外は無効化
-          CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.platform == 'mac' && secrets.CSC_LINK == '' && 'true' || 'false' }}
+          # 証明書の自動検出を無効化（明示的に設定された証明書のみ使用）
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
