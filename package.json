@@ -71,7 +71,7 @@
       "gatekeeperAssess": false,
       "entitlements": "assets/mac/entitlements.mac.plist",
       "entitlementsInherit": "assets/mac/entitlements.mac.inherit.plist",
-      "afterSign": "scripts/notarize.js"
+      "notarize": true
     },
     "win": {
       "icon": "assets/icons/icon.ico",
