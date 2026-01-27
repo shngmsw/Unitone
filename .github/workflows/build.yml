@@ -74,8 +74,8 @@ jobs:
           APPLE_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_ID || '' }}
           APPLE_ID_PASSWORD: ${{ matrix.platform == 'mac' && secrets.APPLE_ID_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_TEAM_ID || '' }}
-          # 証明書がない場合は署名をスキップ
-          CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.platform != 'mac' && 'false' || '' }}
+          # 証明書がない場合のみ macOS で自動検出を有効化し、それ以外は無効化
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.platform == 'mac' && secrets.CSC_LINK == '' && 'true' || 'false' }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
