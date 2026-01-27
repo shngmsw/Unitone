@@ -47,7 +47,7 @@ jobs:
 
       # macOS: 証明書をキーチェーンにインポート
       - name: Import Code Signing Certificate
-        if: matrix.platform == 'mac' && env.CSC_LINK != ''
+        if: matrix.platform == 'mac' && secrets.CSC_LINK != ''
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
