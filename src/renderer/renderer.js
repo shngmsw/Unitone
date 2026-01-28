@@ -8,11 +8,8 @@ class Unitone {
     this.badges = new Map();
     this.loadingTimer = null;
     this.initialLoadDone = new Set();
-<<<<<<< HEAD
     this.faviconExtracted = new Set(); // Track services with extracted favicons
-=======
     this.draggedElement = null;
->>>>>>> origin/copilot/add-sort-functionality-services
 
     this.init();
   }
@@ -120,9 +117,10 @@ class Unitone {
 
       // DOM準備完了時
       webview.addEventListener('dom-ready', () => {
-        // サービスIDをwebviewに送信
+        // サービスIDをwebviewに送信（JSON.stringifyでエスケープしてXSS対策）
+        const serviceIdJson = JSON.stringify(service.id);
         webview.executeJavaScript(`
-          window.postMessage({ type: 'set-service-id', serviceId: '${service.id}' }, '*');
+          window.postMessage({ type: 'set-service-id', serviceId: ${serviceIdJson} }, '*');
         `);
         
         this.initialLoadDone.add(service.id);
@@ -621,16 +619,15 @@ class Unitone {
     document.getElementById('edit-service-modal').classList.remove('hidden');
   }
 
-<<<<<<< HEAD
-  setupResizeHandle() {
+setupResizeHandle() {
     const resizeHandle = document.getElementById('resize-handle');
     const aiCompanion = document.getElementById('ai-companion');
-    
+
     // 要素が存在しない場合は早期リターン
     if (!resizeHandle || !aiCompanion) {
       return;
     }
-    
+
     let isResizing = false;
     let startX = 0;
     let startWidth = 0;
@@ -653,7 +650,7 @@ class Unitone {
         // 右から左へのドラッグなので、差分を反転
         const deltaX = startX - e.clientX;
         const newWidth = Math.max(minWidth, Math.min(maxWidth, startWidth + deltaX));
-        
+
         aiCompanion.style.width = `${newWidth}px`;
       });
     };
@@ -664,7 +661,7 @@ class Unitone {
         aiCompanion.classList.remove('resizing');
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
-        
+
         // 現在の幅を保存
         const currentWidth = aiCompanion.offsetWidth;
         window.unitone.setAiWidth(currentWidth).catch(err => {
@@ -678,7 +675,7 @@ class Unitone {
       if (aiCompanion.classList.contains('hidden')) {
         return;
       }
-      
+
       isResizing = true;
       startX = e.clientX;
       startWidth = aiCompanion.offsetWidth;
@@ -717,7 +714,8 @@ class Unitone {
         });
       }
     });
-=======
+  }
+
   // Drag and drop handlers
   handleDragStart(e) {
     this.draggedElement = e.currentTarget;
@@ -727,9 +725,7 @@ class Unitone {
   }
 
   handleDragOver(e) {
-    if (e.preventDefault) {
-      e.preventDefault();
-    }
+    e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     return false;
   }
@@ -745,13 +741,16 @@ class Unitone {
   }
 
   async handleDrop(e) {
-    if (e.stopPropagation) {
-      e.stopPropagation();
-    }
+    e.stopPropagation();
     e.preventDefault();
 
     const dropTarget = e.currentTarget;
     dropTarget.classList.remove('drag-over');
+
+    // nullチェックを追加
+    if (!this.draggedElement) {
+      return false;
+    }
 
     if (this.draggedElement !== dropTarget) {
       // Get the service IDs
@@ -770,8 +769,9 @@ class Unitone {
         // Save the new order and wait for it to complete
         await window.unitone.reorderServices(this.services);
 
-        // Re-render the service dock
+        // Re-render the service dock (バッジとアクティブ状態を保持)
         this.renderServiceDock();
+        this.restoreBadgesAndActiveState();
       }
     }
 
@@ -780,14 +780,29 @@ class Unitone {
 
   handleDragEnd(e) {
     e.currentTarget.classList.remove('dragging');
-    
+
     // Remove drag-over class from all items
     document.querySelectorAll('.service-item').forEach(item => {
       item.classList.remove('drag-over');
     });
-    
+
     this.draggedElement = null;
->>>>>>> origin/copilot/add-sort-functionality-services
+  }
+
+  // バッジとアクティブ状態を復元
+  restoreBadgesAndActiveState() {
+    // バッジを復元
+    this.badges.forEach((count, serviceId) => {
+      this.updateBadge(serviceId, count);
+    });
+
+    // アクティブ状態を復元
+    if (this.activeServiceId) {
+      const activeItem = document.querySelector(`.service-item[data-service-id="${this.activeServiceId}"]`);
+      if (activeItem) {
+        activeItem.classList.add('active');
+      }
+    }
   }
 }
 
