@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld('unitone', {
   getGeminiUrl: () => ipcRenderer.invoke('get-gemini-url'),
   getShowAiCompanion: () => ipcRenderer.invoke('get-show-ai-companion'),
   setShowAiCompanion: (show) => ipcRenderer.invoke('set-show-ai-companion', show),
+  getAiWidth: () => ipcRenderer.invoke('get-ai-width'),
+  setAiWidth: (width) => ipcRenderer.invoke('set-ai-width', width),
 
   // 通知バッジ
   updateBadge: (serviceId, count) => ipcRenderer.send('update-badge', { serviceId, count }),

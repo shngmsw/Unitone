@@ -8,6 +8,8 @@
   /* レイアウト */
   --dock-width: 64px;
   --ai-width: 400px;
+  --ai-min-width: 300px;
+  --ai-max-width: 800px;
 
   /* スペーシング（8pxグリッド） - SHIG #85 整然とレイアウト */
   --space-xs: 4px;
@@ -312,12 +314,39 @@ body.platform-darwin #service-dock {
   flex-direction: column;
   transition: width var(--transition-slow),
               opacity var(--transition-slow);
+  position: relative;
 }
 
 #ai-companion.hidden {
-  width: 0;
+  width: 0 !important;
   opacity: 0;
   overflow: hidden;
+}
+
+#ai-companion.resizing {
+  transition: opacity var(--transition-slow);
+}
+
+/* リサイズハンドル */
+#resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+  z-index: 10;
+  background: transparent;
+  transition: background-color var(--transition-fast);
+}
+
+#resize-handle:hover {
+  background: var(--accent-subtle);
+}
+
+#resize-handle:active,
+#ai-companion.resizing #resize-handle {
+  background: var(--accent);
 }
 
 #ai-header {

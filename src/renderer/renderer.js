@@ -22,6 +22,7 @@ class Unitone {
     this.services = await window.unitone.getServices();
     this.activeServiceId = await window.unitone.getActiveService();
     const showAiCompanion = await window.unitone.getShowAiCompanion();
+    const aiWidth = await window.unitone.getAiWidth();
 
     // サービスドックを構築
     this.renderServiceDock();
@@ -30,10 +31,13 @@ class Unitone {
     this.createWebViews();
 
     // AIコンパニオンを設定
-    await this.setupAiCompanion(showAiCompanion);
+    await this.setupAiCompanion(showAiCompanion, aiWidth);
 
     // イベントリスナーを設定
     this.setupEventListeners();
+
+    // リサイズハンドルを設定
+    this.setupResizeHandle();
 
     // バッジ更新をリッスン
     window.unitone.onBadgeUpdated(({ serviceId, count }) => {
@@ -198,10 +202,18 @@ class Unitone {
     window.unitone.setActiveService(serviceId);
   }
 
-  async setupAiCompanion(show) {
+  async setupAiCompanion(show, width) {
     const aiCompanion = document.getElementById('ai-companion');
     const aiWebview = document.getElementById('ai-webview');
     const geminiUrl = await window.unitone.getGeminiUrl();
+
+    // 幅を設定（300-800pxの範囲でバリデーション）
+    if (width) {
+      const minWidth = 300;
+      const maxWidth = 800;
+      const validWidth = Math.max(minWidth, Math.min(maxWidth, width));
+      aiCompanion.style.width = `${validWidth}px`;
+    }
 
     if (show) {
       aiCompanion.classList.remove('hidden');
@@ -582,6 +594,103 @@ class Unitone {
     document.getElementById('edit-service-icon').value = service.icon;
 
     document.getElementById('edit-service-modal').classList.remove('hidden');
+  }
+
+  setupResizeHandle() {
+    const resizeHandle = document.getElementById('resize-handle');
+    const aiCompanion = document.getElementById('ai-companion');
+    
+    // 要素が存在しない場合は早期リターン
+    if (!resizeHandle || !aiCompanion) {
+      return;
+    }
+    
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+    let animationFrameId = null;
+
+    // CSS変数から最小・最大幅を取得
+    const computedStyle = getComputedStyle(document.documentElement);
+    const minWidth = parseInt(computedStyle.getPropertyValue('--ai-min-width')) || 300;
+    const maxWidth = parseInt(computedStyle.getPropertyValue('--ai-max-width')) || 800;
+
+    const onMouseMove = (e) => {
+      if (!isResizing || aiCompanion.classList.contains('hidden')) return;
+
+      // requestAnimationFrameでパフォーマンス最適化
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+
+      animationFrameId = requestAnimationFrame(() => {
+        // 右から左へのドラッグなので、差分を反転
+        const deltaX = startX - e.clientX;
+        const newWidth = Math.max(minWidth, Math.min(maxWidth, startWidth + deltaX));
+        
+        aiCompanion.style.width = `${newWidth}px`;
+      });
+    };
+
+    const onMouseUp = () => {
+      if (isResizing) {
+        isResizing = false;
+        aiCompanion.classList.remove('resizing');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        
+        // 現在の幅を保存
+        const currentWidth = aiCompanion.offsetWidth;
+        window.unitone.setAiWidth(currentWidth).catch(err => {
+          console.warn('AI幅の保存に失敗しました:', err);
+        });
+      }
+    };
+
+    resizeHandle.addEventListener('mousedown', (e) => {
+      // 非表示の場合はリサイズを許可しない
+      if (aiCompanion.classList.contains('hidden')) {
+        return;
+      }
+      
+      isResizing = true;
+      startX = e.clientX;
+      startWidth = aiCompanion.offsetWidth;
+      aiCompanion.classList.add('resizing');
+      document.body.style.cursor = 'ew-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+
+    // キーボードアクセシビリティ: 矢印キーでリサイズ
+    resizeHandle.addEventListener('keydown', (e) => {
+      if (aiCompanion.classList.contains('hidden')) return;
+
+      const step = 10; // 1回のキー押下で10px変更
+      let currentWidth = aiCompanion.offsetWidth;
+      let newWidth = currentWidth;
+
+      if (e.key === 'ArrowLeft') {
+        // 左矢印: 幅を広げる
+        newWidth = Math.min(maxWidth, currentWidth + step);
+        e.preventDefault();
+      } else if (e.key === 'ArrowRight') {
+        // 右矢印: 幅を狭める
+        newWidth = Math.max(minWidth, currentWidth - step);
+        e.preventDefault();
+      }
+
+      if (newWidth !== currentWidth) {
+        aiCompanion.style.width = `${newWidth}px`;
+        // 幅を保存
+        window.unitone.setAiWidth(newWidth).catch(err => {
+          console.warn('AI幅の保存に失敗しました:', err);
+        });
+      }
+    });
   }
 }
 
