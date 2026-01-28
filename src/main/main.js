@@ -235,6 +235,11 @@ ipcMain.handle('update-service', (event, updatedService) => {
   return services;
 });
 
+ipcMain.handle('reorder-services', (event, reorderedServices) => {
+  store.set('services', reorderedServices);
+  return reorderedServices;
+});
+
 ipcMain.handle('get-active-service', () => {
   return store.get('activeServiceId');
 });

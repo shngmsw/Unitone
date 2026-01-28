@@ -153,6 +153,22 @@ body.platform-linux #service-dock {
   border-radius: 2px;
 }
 
+/* Drag and drop styles */
+.service-item.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.service-item.drag-over {
+  background: var(--bg-elevated);
+  border: 2px dashed var(--accent);
+  transform: scale(1.05);
+}
+
+.service-item[draggable="true"] {
+  cursor: grab;
+}
+
 /* SHIG #66 操作の近くでフィードバック */
 .service-item .badge {
   position: absolute;

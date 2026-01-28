@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('unitone', {
   addService: (service) => ipcRenderer.invoke('add-service', service),
   removeService: (serviceId) => ipcRenderer.invoke('remove-service', serviceId),
   updateService: (service) => ipcRenderer.invoke('update-service', service),
+  reorderServices: (services) => ipcRenderer.invoke('reorder-services', services),
 
   // アクティブサービス
   getActiveService: () => ipcRenderer.invoke('get-active-service'),

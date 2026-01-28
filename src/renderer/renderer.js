@@ -8,6 +8,7 @@ class Unitone {
     this.badges = new Map();
     this.loadingTimer = null;
     this.initialLoadDone = new Set();
+    this.draggedElement = null;
 
     this.init();
   }
@@ -66,12 +67,22 @@ class Unitone {
       item.className = 'service-item';
       item.dataset.serviceId = service.id;
       item.title = service.name;
+      item.draggable = true;
       item.innerHTML = `
         ${service.icon}
         <span class="badge hidden">0</span>
       `;
 
       item.addEventListener('click', () => this.switchService(service.id));
+      
+      // Drag and drop event listeners
+      item.addEventListener('dragstart', (e) => this.handleDragStart(e));
+      item.addEventListener('dragover', (e) => this.handleDragOver(e));
+      item.addEventListener('drop', (e) => this.handleDrop(e));
+      item.addEventListener('dragend', (e) => this.handleDragEnd(e));
+      item.addEventListener('dragenter', (e) => this.handleDragEnter(e));
+      item.addEventListener('dragleave', (e) => this.handleDragLeave(e));
+
       serviceList.appendChild(item);
     });
   }
@@ -479,6 +490,77 @@ class Unitone {
     document.getElementById('edit-service-icon').value = service.icon;
 
     document.getElementById('edit-service-modal').classList.remove('hidden');
+  }
+
+  // Drag and drop handlers
+  handleDragStart(e) {
+    this.draggedElement = e.currentTarget;
+    e.currentTarget.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', e.currentTarget.innerHTML);
+  }
+
+  handleDragOver(e) {
+    if (e.preventDefault) {
+      e.preventDefault();
+    }
+    e.dataTransfer.dropEffect = 'move';
+    return false;
+  }
+
+  handleDragEnter(e) {
+    if (e.currentTarget !== this.draggedElement) {
+      e.currentTarget.classList.add('drag-over');
+    }
+  }
+
+  handleDragLeave(e) {
+    e.currentTarget.classList.remove('drag-over');
+  }
+
+  handleDrop(e) {
+    if (e.stopPropagation) {
+      e.stopPropagation();
+    }
+    e.preventDefault();
+
+    const dropTarget = e.currentTarget;
+    dropTarget.classList.remove('drag-over');
+
+    if (this.draggedElement !== dropTarget) {
+      // Get the service IDs
+      const draggedId = this.draggedElement.dataset.serviceId;
+      const targetId = dropTarget.dataset.serviceId;
+
+      // Find indices in the services array
+      const draggedIndex = this.services.findIndex(s => s.id === draggedId);
+      const targetIndex = this.services.findIndex(s => s.id === targetId);
+
+      if (draggedIndex !== -1 && targetIndex !== -1) {
+        // Reorder the services array
+        const [draggedService] = this.services.splice(draggedIndex, 1);
+        this.services.splice(targetIndex, 0, draggedService);
+
+        // Save the new order
+        window.unitone.reorderServices(this.services);
+
+        // Re-render the service dock
+        this.renderServiceDock();
+      }
+    }
+
+    return false;
+  }
+
+  handleDragEnd(e) {
+    e.currentTarget.classList.remove('dragging');
+    
+    // Remove drag-over class from all items
+    document.querySelectorAll('.service-item').forEach(item => {
+      item.classList.remove('drag-over');
+    });
+    
+    this.draggedElement = null;
   }
 }
 
