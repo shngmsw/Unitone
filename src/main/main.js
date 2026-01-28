@@ -218,6 +218,11 @@ ipcMain.handle('add-service', (event, service) => {
   };
   services.push(newService);
   store.set('services', services);
+  
+  // 新しいサービスのセッションにプリロードスクリプトを設定
+  const ses = session.fromPartition(`persist:${newService.id}`);
+  ses.setPreloads([path.join(__dirname, '../preload/webview-preload.js')]);
+  
   return services;
 });
 
