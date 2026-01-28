@@ -497,7 +497,7 @@ class Unitone {
     this.draggedElement = e.currentTarget;
     e.currentTarget.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/html', e.currentTarget.innerHTML);
+    e.dataTransfer.setData('text/plain', e.currentTarget.dataset.serviceId);
   }
 
   handleDragOver(e) {
@@ -518,7 +518,7 @@ class Unitone {
     e.currentTarget.classList.remove('drag-over');
   }
 
-  handleDrop(e) {
+  async handleDrop(e) {
     if (e.stopPropagation) {
       e.stopPropagation();
     }
@@ -541,8 +541,8 @@ class Unitone {
         const [draggedService] = this.services.splice(draggedIndex, 1);
         this.services.splice(targetIndex, 0, draggedService);
 
-        // Save the new order
-        window.unitone.reorderServices(this.services);
+        // Save the new order and wait for it to complete
+        await window.unitone.reorderServices(this.services);
 
         // Re-render the service dock
         this.renderServiceDock();

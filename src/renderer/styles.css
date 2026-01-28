@@ -161,8 +161,7 @@ body.platform-linux #service-dock {
 
 .service-item.drag-over {
   background: var(--bg-elevated);
-  border: 2px dashed var(--accent);
-  transform: scale(1.05);
+  box-shadow: 0 0 0 2px var(--accent), var(--shadow-md);
 }
 
 .service-item[draggable="true"] {
