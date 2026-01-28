@@ -218,6 +218,11 @@ ipcMain.handle('add-service', (event, service) => {
   };
   services.push(newService);
   store.set('services', services);
+  
+  // 新しいサービスのセッションにプリロードスクリプトを設定
+  const ses = session.fromPartition(`persist:${newService.id}`);
+  ses.setPreloads([path.join(__dirname, '../preload/webview-preload.js')]);
+  
   return services;
 });
 
@@ -363,6 +368,17 @@ ipcMain.handle('get-platform', () => {
 
 // アプリ起動
 app.whenReady().then(() => {
+  // WebView用のプリロードスクリプトを設定
+  const services = store.get('services');
+  services.forEach(service => {
+    const ses = session.fromPartition(`persist:${service.id}`);
+    ses.setPreloads([path.join(__dirname, '../preload/webview-preload.js')]);
+  });
+  
+  // Gemini用のセッションにもプリロードを設定
+  const geminiSession = session.fromPartition('persist:gemini');
+  geminiSession.setPreloads([path.join(__dirname, '../preload/webview-preload.js')]);
+  
   createWindow();
   createTray();
 
