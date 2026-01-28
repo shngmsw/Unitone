@@ -45,20 +45,5 @@ jobs:
             echo "release_created=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Get latest tag
-        id: get-tag
-        if: steps.semantic-release.outputs.release_created == 'true'
-        run: |
-          # 最新のタグを取得
-          git fetch --tags
-          LATEST_TAG=$(git describe --tags --abbrev=0)
-          echo "tag_name=$LATEST_TAG" >> $GITHUB_OUTPUT
-          echo "Latest tag: $LATEST_TAG"
-
-      - name: Trigger Release Build workflow
-        if: steps.semantic-release.outputs.release_created == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh workflow run release.yml \
-            --field tag_name=${{ steps.get-tag.outputs.tag_name }}
+      # semantic-releaseがGitHub Releaseを作成すると、
+      # release.ymlが `release: published` イベントで自動的にトリガーされます
