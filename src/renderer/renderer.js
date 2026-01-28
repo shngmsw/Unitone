@@ -170,14 +170,6 @@ class Unitone {
       container.appendChild(webview);
       this.webviews.set(service.id, webview);
     });
-
-    // webviewからのメッセージを受け取る
-    window.addEventListener('message', (event) => {
-      if (event.data && event.data.type === 'notification-count') {
-        this.updateBadge(event.data.serviceId, event.data.count);
-        window.unitone.updateBadge(event.data.serviceId, event.data.count);
-      }
-    });
   }
 
   switchService(serviceId) {

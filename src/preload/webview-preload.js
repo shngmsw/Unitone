@@ -1,6 +1,8 @@
 // WebView用プリロードスクリプト
 // 各チャットサービスの通知を検知する
 
+const { ipcRenderer } = require('electron');
+
 (function() {
   // document.titleの変更を監視して通知数を検出
   let lastTitle = document.title;
@@ -31,11 +33,8 @@
     if (count === lastCount) return;
     lastCount = count;
 
-    window.parent.postMessage({
-      type: 'notification-count',
-      serviceId: serviceId,
-      count: count
-    }, '*');
+    // webviewからrendererにメッセージを送信
+    ipcRenderer.sendToHost('notification-count', count);
   }
 
   // デバウンス付きタイトル変更ハンドラ（Apple Silicon最適化）
@@ -70,11 +69,7 @@
     // 初回チェック
     const count = extractNotificationCount(document.title);
     lastCount = count;
-    window.parent.postMessage({
-      type: 'notification-count',
-      serviceId: serviceId,
-      count: count
-    }, '*');
+    ipcRenderer.sendToHost('notification-count', count);
   }
 
   // サービスIDを受け取る
@@ -96,12 +91,10 @@
 
   window.Notification = function(title, options) {
     // 親ウィンドウに通知を送信
-    window.parent.postMessage({
-      type: 'browser-notification',
-      serviceId: serviceId,
+    ipcRenderer.sendToHost('browser-notification', {
       title: title,
       body: options?.body || ''
-    }, '*');
+    });
 
     // オリジナルの通知を作成
     return new OriginalNotification(title, options);
