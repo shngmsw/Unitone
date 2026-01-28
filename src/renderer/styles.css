@@ -67,7 +67,8 @@ html, body {
   border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  padding: 0 var(--space-sm);
   -webkit-app-region: drag;
   user-select: none;
 }
@@ -76,11 +77,19 @@ html, body {
   font-size: 12px;
   font-weight: 500;
   color: var(--text-secondary);
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 /* macOS: トラフィックライト用スペース */
 body.platform-darwin #app-header {
   padding-left: 80px;
+}
+
+/* Windows: ウィンドウコントロール用スペース */
+body.platform-win32 #app-header {
+  padding-right: 140px;
 }
 
 #app {
@@ -804,3 +813,4 @@ body.resizing-active iframe {
 [title] {
   position: relative;
 }
+

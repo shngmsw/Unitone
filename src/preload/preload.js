@@ -50,5 +50,6 @@ contextBridge.exposeInMainWorld('unitone', {
   windowIsMaximized: () => ipcRenderer.invoke('window-is-maximized'),
 
   // プラットフォーム情報
-  getPlatform: () => ipcRenderer.invoke('get-platform')
+  getPlatform: () => ipcRenderer.invoke('get-platform'),
+
 });

@@ -506,18 +506,18 @@ ipcMain.handle('get-platform', () => {
 });
 
 // アプリ起動
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // WebView用のプリロードスクリプトを設定
   const services = store.get('services');
   services.forEach(service => {
     const ses = session.fromPartition(`persist:${service.id}`);
     ses.setPreloads([path.join(__dirname, '../preload/webview-preload.js')]);
   });
-  
-  // Gemini用のセッションにもプリロードを設定
-  const geminiSession = session.fromPartition('persist:gemini');
-  geminiSession.setPreloads([path.join(__dirname, '../preload/webview-preload.js')]);
-  
+
+  // AI用のセッションにもプリロードを設定
+  const aiSession = session.fromPartition('persist:ai');
+  aiSession.setPreloads([path.join(__dirname, '../preload/webview-preload.js')]);
+
   createWindow();
   createTray();
 
