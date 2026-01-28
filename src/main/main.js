@@ -19,7 +19,8 @@ const store = new Store({
     geminiUrl: 'https://gemini.google.com',
     windowBounds: { width: 1400, height: 900 },
     activeServiceId: 'slack',
-    showAiCompanion: true
+    showAiCompanion: true,
+    aiWidth: 400
   }
 });
 
@@ -255,6 +256,15 @@ ipcMain.handle('get-show-ai-companion', () => {
 ipcMain.handle('set-show-ai-companion', (event, show) => {
   store.set('showAiCompanion', show);
   return show;
+});
+
+ipcMain.handle('get-ai-width', () => {
+  return store.get('aiWidth', 400);
+});
+
+ipcMain.handle('set-ai-width', (event, width) => {
+  store.set('aiWidth', width);
+  return width;
 });
 
 // 通知バッジ更新
