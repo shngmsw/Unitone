@@ -265,6 +265,17 @@ class Unitone {
     const webview = this.webviews.get(this.activeServiceId);
     if (webview && url) {
       webview.src = url;
+      
+      // Slackの場合、認証後のURLを保存する
+      // Format: https://app.slack.com/client/XXXXXXXXX/XXXXXXXXX
+      if (this.activeServiceId === 'slack' && url.includes('app.slack.com/client/')) {
+        window.unitone.updateServiceUrl('slack', url).then(() => {
+          // URLが更新されたらサービスリストを再読み込み
+          window.unitone.getServices().then(services => {
+            this.services = services;
+          });
+        });
+      }
     } else if (webview) {
       webview.reload();
     }

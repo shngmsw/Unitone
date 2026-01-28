@@ -11,7 +11,7 @@ const isLinux = process.platform === 'linux';
 const store = new Store({
   defaults: {
     services: [
-      { id: 'slack', name: 'Slack', url: 'https://slack.com/signin', icon: '💬', enabled: true },
+      { id: 'slack', name: 'Slack', url: 'https://app.slack.com', icon: '💬', enabled: true },
       { id: 'gchat', name: 'Google Chat', url: 'https://chat.google.com', icon: '💭', enabled: true },
       { id: 'teams', name: 'Teams', url: 'https://teams.microsoft.com', icon: '👥', enabled: true },
       { id: 'chatwork', name: 'Chatwork', url: 'https://www.chatwork.com', icon: '📝', enabled: true }
@@ -249,10 +249,10 @@ ipcMain.handle('reorder-services', (event, reorderedServices) => {
   }
 
   const currentServices = store.get('services');
-  
+
   // Validate that all services have required properties
-  const isValid = reorderedServices.every(service => 
-    service && 
+  const isValid = reorderedServices.every(service =>
+    service &&
     typeof service.id === 'string' &&
     typeof service.name === 'string' &&
     typeof service.url === 'string' &&
@@ -268,8 +268,8 @@ ipcMain.handle('reorder-services', (event, reorderedServices) => {
   // Validate that we have the same set of service IDs
   const currentIds = currentServices.map(s => s.id).sort();
   const reorderedIds = reorderedServices.map(s => s.id).sort();
-  
-  if (currentIds.length !== reorderedIds.length || 
+
+  if (currentIds.length !== reorderedIds.length ||
       !currentIds.every((id, index) => id === reorderedIds[index])) {
     console.error('Invalid reorder-services request: service IDs do not match');
     return currentServices;
@@ -277,6 +277,32 @@ ipcMain.handle('reorder-services', (event, reorderedServices) => {
 
   store.set('services', reorderedServices);
   return reorderedServices;
+});
+
+ipcMain.handle('update-service-url', (event, serviceId, url) => {
+  // URLバリデーション
+  if (typeof serviceId !== 'string' || typeof url !== 'string') {
+    console.error('Invalid update-service-url request: invalid parameters');
+    return store.get('services');
+  }
+
+  try {
+    const parsedUrl = new URL(url);
+    // http/httpsのみ許可
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      console.error('Invalid update-service-url request: invalid protocol');
+      return store.get('services');
+    }
+  } catch {
+    console.error('Invalid update-service-url request: invalid URL format');
+    return store.get('services');
+  }
+
+  const services = store.get('services').map(s =>
+    s.id === serviceId ? { ...s, url } : s
+  );
+  store.set('services', services);
+  return services;
 });
 
 ipcMain.handle('get-active-service', () => {
