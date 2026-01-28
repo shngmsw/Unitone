@@ -66,10 +66,19 @@ class Unitone {
       item.className = 'service-item';
       item.dataset.serviceId = service.id;
       item.title = service.name;
-      item.innerHTML = `
-        ${service.icon}
-        <span class="badge hidden">0</span>
-      `;
+      
+      // Use favicon if available, otherwise use emoji
+      if (service.faviconUrl) {
+        item.innerHTML = `
+          <img src="${service.faviconUrl}" class="service-favicon" alt="${service.name}">
+          <span class="badge hidden">0</span>
+        `;
+      } else {
+        item.innerHTML = `
+          ${service.icon}
+          <span class="badge hidden">0</span>
+        `;
+      }
 
       item.addEventListener('click', () => this.switchService(service.id));
       serviceList.appendChild(item);
@@ -93,6 +102,9 @@ class Unitone {
         if (this.activeServiceId === service.id) {
           this.hideLoading();
         }
+        
+        // Extract favicon from the loaded page
+        this.extractFavicon(webview, service.id);
       });
 
       // 読み込み完了時
@@ -308,6 +320,46 @@ class Unitone {
       this.loadingTimer = null;
     }
     document.getElementById('loading-indicator').classList.add('hidden');
+  }
+
+  async extractFavicon(webview, serviceId) {
+    try {
+      // Execute script in webview to get favicon URL
+      const faviconUrl = await webview.executeJavaScript(`
+        (function() {
+          // Try different selectors for favicon
+          const selectors = [
+            'link[rel="icon"]',
+            'link[rel="shortcut icon"]',
+            'link[rel="apple-touch-icon"]',
+            'link[rel="apple-touch-icon-precomposed"]'
+          ];
+          
+          for (const selector of selectors) {
+            const link = document.querySelector(selector);
+            if (link && link.href) {
+              return link.href;
+            }
+          }
+          
+          // Fallback to /favicon.ico
+          return new URL('/favicon.ico', window.location.origin).href;
+        })();
+      `);
+
+      if (faviconUrl) {
+        // Update service with favicon URL
+        const service = this.services.find(s => s.id === serviceId);
+        if (service && service.faviconUrl !== faviconUrl) {
+          service.faviconUrl = faviconUrl;
+          await window.unitone.updateService(service);
+          this.services = await window.unitone.getServices();
+          this.renderServiceDock();
+        }
+      }
+    } catch (error) {
+      console.warn(`Failed to extract favicon for ${serviceId}:`, error);
+    }
   }
 
   setupEventListeners() {

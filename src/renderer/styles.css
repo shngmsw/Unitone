@@ -146,6 +146,12 @@ body.platform-darwin #service-dock {
   padding: 0;
 }
 
+.service-item .service-favicon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
 /* SHIG #74 ハイライト表現は構成要素を1つだけ変化 */
 .service-item:hover {
   background: var(--bg-elevated);
