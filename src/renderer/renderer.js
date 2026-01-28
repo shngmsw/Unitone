@@ -8,6 +8,7 @@ class Unitone {
     this.badges = new Map();
     this.loadingTimer = null;
     this.initialLoadDone = new Set();
+    this.faviconExtracted = new Set(); // Track services with extracted favicons
 
     this.init();
   }
@@ -69,16 +70,19 @@ class Unitone {
       
       // Use favicon if available, otherwise use emoji
       if (service.faviconUrl) {
-        item.innerHTML = `
-          <img src="${service.faviconUrl}" class="service-favicon" alt="${service.name}">
-          <span class="badge hidden">0</span>
-        `;
+        const img = document.createElement('img');
+        img.className = 'service-favicon';
+        img.src = service.faviconUrl;
+        img.alt = service.name;
+        item.appendChild(img);
       } else {
-        item.innerHTML = `
-          ${service.icon}
-          <span class="badge hidden">0</span>
-        `;
+        item.textContent = service.icon;
       }
+      
+      const badge = document.createElement('span');
+      badge.className = 'badge hidden';
+      badge.textContent = '0';
+      item.appendChild(badge);
 
       item.addEventListener('click', () => this.switchService(service.id));
       serviceList.appendChild(item);
@@ -103,8 +107,10 @@ class Unitone {
           this.hideLoading();
         }
         
-        // Extract favicon from the loaded page
-        this.extractFavicon(webview, service.id);
+        // Extract favicon from the loaded page (only once per service)
+        if (!this.faviconExtracted.has(service.id)) {
+          this.extractFavicon(webview, service.id);
+        }
       });
 
       // 読み込み完了時
@@ -342,23 +348,63 @@ class Unitone {
             }
           }
           
-          // Fallback to /favicon.ico
-          return new URL('/favicon.ico', window.location.origin).href;
+          // Return null if no favicon found (don't fallback to /favicon.ico)
+          return null;
         })();
       `);
 
-      if (faviconUrl) {
+      if (faviconUrl && this.isValidFaviconUrl(faviconUrl)) {
+        // Mark as extracted to prevent repeated attempts
+        this.faviconExtracted.add(serviceId);
+        
         // Update service with favicon URL
         const service = this.services.find(s => s.id === serviceId);
         if (service && service.faviconUrl !== faviconUrl) {
           service.faviconUrl = faviconUrl;
           await window.unitone.updateService(service);
-          this.services = await window.unitone.getServices();
-          this.renderServiceDock();
+          
+          // Update only this service's icon instead of re-rendering entire dock
+          this.updateServiceIcon(serviceId, faviconUrl);
         }
       }
     } catch (error) {
       console.warn(`Failed to extract favicon for ${serviceId}:`, error);
+      // Mark as extracted to prevent retrying on every dom-ready
+      this.faviconExtracted.add(serviceId);
+    }
+  }
+
+  isValidFaviconUrl(url) {
+    try {
+      const parsedUrl = new URL(url);
+      // Only allow http, https, and data URLs (not javascript:)
+      return ['http:', 'https:', 'data:'].includes(parsedUrl.protocol);
+    } catch {
+      return false;
+    }
+  }
+
+  updateServiceIcon(serviceId, faviconUrl) {
+    const item = document.querySelector(`.service-item[data-service-id="${serviceId}"]`);
+    if (item) {
+      // Remove old icon (emoji or old favicon)
+      const oldIcon = item.querySelector('.service-favicon') || item.firstChild;
+      if (oldIcon && oldIcon.nodeType === Node.TEXT_NODE) {
+        oldIcon.remove();
+      } else if (oldIcon && oldIcon.classList && oldIcon.classList.contains('service-favicon')) {
+        oldIcon.remove();
+      }
+      
+      // Add new favicon
+      const img = document.createElement('img');
+      img.className = 'service-favicon';
+      img.src = faviconUrl;
+      const service = this.services.find(s => s.id === serviceId);
+      img.alt = service ? service.name : '';
+      
+      // Insert before badge
+      const badge = item.querySelector('.badge');
+      item.insertBefore(img, badge);
     }
   }
 
