@@ -263,6 +263,11 @@ ipcMain.handle('get-ai-width', () => {
 });
 
 ipcMain.handle('set-ai-width', (event, width) => {
+  // 幅のバリデーション（300-800px）
+  if (typeof width !== 'number' || isNaN(width) || width < 300 || width > 800) {
+    console.warn('Invalid AI width:', width);
+    return store.get('aiWidth', 400);
+  }
   store.set('aiWidth', width);
   return width;
 });

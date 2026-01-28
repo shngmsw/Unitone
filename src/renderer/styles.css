@@ -284,7 +284,8 @@ body.platform-linux #service-dock {
   border-left: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
-  transition: opacity var(--transition-slow);
+  transition: width var(--transition-slow),
+              opacity var(--transition-slow);
   position: relative;
 }
 
@@ -295,7 +296,7 @@ body.platform-linux #service-dock {
 }
 
 #ai-companion.resizing {
-  transition: none;
+  transition: opacity var(--transition-slow);
 }
 
 /* リサイズハンドル */
