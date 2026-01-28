@@ -122,15 +122,10 @@ class Unitone {
         webview.executeJavaScript(`
           window.postMessage({ type: 'set-service-id', serviceId: ${serviceIdJson} }, '*');
         `);
-        
+
         this.initialLoadDone.add(service.id);
         if (this.activeServiceId === service.id) {
           this.hideLoading();
-        }
-        
-        // Extract favicon from the loaded page (only once per service)
-        if (!this.faviconExtracted.has(service.id)) {
-          this.extractFavicon(webview, service.id);
         }
       });
 
@@ -139,6 +134,14 @@ class Unitone {
         this.initialLoadDone.add(service.id);
         if (this.activeServiceId === service.id) {
           this.hideLoading();
+        }
+
+        // Extract favicon from the loaded page (only once per service)
+        // SPAが完全に読み込まれるのを待つため少し遅延させる
+        if (!this.faviconExtracted.has(service.id)) {
+          setTimeout(() => {
+            this.extractFavicon(webview, service.id);
+          }, 1500);
         }
       });
 
@@ -376,36 +379,39 @@ class Unitone {
           // Try different selectors for favicon
           const selectors = [
             'link[rel="icon"]',
+            'link[rel*="icon"]',
             'link[rel="shortcut icon"]',
             'link[rel="apple-touch-icon"]',
             'link[rel="apple-touch-icon-precomposed"]'
           ];
-          
+
           for (const selector of selectors) {
             const link = document.querySelector(selector);
             if (link && link.href) {
               return link.href;
             }
           }
-          
-          // Return null if no favicon found (don't fallback to /favicon.ico)
-          return null;
+
+          // Fallback to /favicon.ico
+          return new URL('/favicon.ico', window.location.origin).href;
         })();
       `);
 
       if (faviconUrl && this.isValidFaviconUrl(faviconUrl)) {
         // Mark as extracted to prevent repeated attempts
         this.faviconExtracted.add(serviceId);
-        
+
         // Update service with favicon URL
         const service = this.services.find(s => s.id === serviceId);
         if (service && service.faviconUrl !== faviconUrl) {
           service.faviconUrl = faviconUrl;
           await window.unitone.updateService(service);
-          
+
           // Update only this service's icon instead of re-rendering entire dock
           this.updateServiceIcon(serviceId, faviconUrl);
         }
+      } else {
+        this.faviconExtracted.add(serviceId);
       }
     } catch (error) {
       console.warn(`Failed to extract favicon for ${serviceId}:`, error);
@@ -427,6 +433,8 @@ class Unitone {
   updateServiceIcon(serviceId, faviconUrl) {
     const item = document.querySelector(`.service-item[data-service-id="${serviceId}"]`);
     if (item) {
+      const service = this.services.find(s => s.id === serviceId);
+
       // Remove old icon (emoji or old favicon)
       const oldIcon = item.querySelector('.service-favicon') || item.firstChild;
       if (oldIcon && oldIcon.nodeType === Node.TEXT_NODE) {
@@ -434,14 +442,26 @@ class Unitone {
       } else if (oldIcon && oldIcon.classList && oldIcon.classList.contains('service-favicon')) {
         oldIcon.remove();
       }
-      
+
       // Add new favicon
       const img = document.createElement('img');
       img.className = 'service-favicon';
       img.src = faviconUrl;
-      const service = this.services.find(s => s.id === serviceId);
       img.alt = service ? service.name : '';
-      
+
+      // 読み込み失敗時はemojiにフォールバック
+      img.onerror = () => {
+        img.remove();
+        if (service) {
+          const badge = item.querySelector('.badge');
+          const textNode = document.createTextNode(service.icon);
+          item.insertBefore(textNode, badge);
+          // 保存されたfaviconUrlをクリア
+          service.faviconUrl = null;
+          window.unitone.updateService(service);
+        }
+      };
+
       // Insert before badge
       const badge = item.querySelector('.badge');
       item.insertBefore(img, badge);
