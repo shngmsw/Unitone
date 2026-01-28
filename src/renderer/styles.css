@@ -183,6 +183,21 @@ body.platform-darwin #service-dock {
   border-radius: 2px;
 }
 
+/* Drag and drop styles */
+.service-item.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.service-item.drag-over {
+  background: var(--bg-elevated);
+  box-shadow: 0 0 0 2px var(--accent), var(--shadow-md);
+}
+
+.service-item[draggable="true"] {
+  cursor: grab;
+}
+
 /* SHIG #66 操作の近くでフィードバック */
 .service-item .badge {
   position: absolute;

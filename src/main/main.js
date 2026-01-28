@@ -241,6 +241,44 @@ ipcMain.handle('update-service', (event, updatedService) => {
   return services;
 });
 
+ipcMain.handle('reorder-services', (event, reorderedServices) => {
+  // Validate input
+  if (!Array.isArray(reorderedServices)) {
+    console.error('Invalid reorder-services request: not an array');
+    return store.get('services');
+  }
+
+  const currentServices = store.get('services');
+  
+  // Validate that all services have required properties
+  const isValid = reorderedServices.every(service => 
+    service && 
+    typeof service.id === 'string' &&
+    typeof service.name === 'string' &&
+    typeof service.url === 'string' &&
+    typeof service.icon === 'string' &&
+    typeof service.enabled === 'boolean'
+  );
+
+  if (!isValid) {
+    console.error('Invalid reorder-services request: missing or invalid properties');
+    return currentServices;
+  }
+
+  // Validate that we have the same set of service IDs
+  const currentIds = currentServices.map(s => s.id).sort();
+  const reorderedIds = reorderedServices.map(s => s.id).sort();
+  
+  if (currentIds.length !== reorderedIds.length || 
+      !currentIds.every((id, index) => id === reorderedIds[index])) {
+    console.error('Invalid reorder-services request: service IDs do not match');
+    return currentServices;
+  }
+
+  store.set('services', reorderedServices);
+  return reorderedServices;
+});
+
 ipcMain.handle('get-active-service', () => {
   return store.get('activeServiceId');
 });
