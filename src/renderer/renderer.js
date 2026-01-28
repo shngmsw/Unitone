@@ -89,6 +89,11 @@ class Unitone {
 
       // DOM準備完了時
       webview.addEventListener('dom-ready', () => {
+        // サービスIDをwebviewに送信
+        webview.executeJavaScript(`
+          window.postMessage({ type: 'set-service-id', serviceId: '${service.id}' }, '*');
+        `);
+        
         this.initialLoadDone.add(service.id);
         if (this.activeServiceId === service.id) {
           this.hideLoading();
