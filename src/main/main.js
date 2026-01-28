@@ -11,7 +11,7 @@ const isLinux = process.platform === 'linux';
 const store = new Store({
   defaults: {
     services: [
-      { id: 'slack', name: 'Slack', url: 'https://slack.com/signin', icon: '💬', enabled: true },
+      { id: 'slack', name: 'Slack', url: 'https://app.slack.com', icon: '💬', enabled: true },
       { id: 'gchat', name: 'Google Chat', url: 'https://chat.google.com', icon: '💭', enabled: true },
       { id: 'teams', name: 'Teams', url: 'https://teams.microsoft.com', icon: '👥', enabled: true },
       { id: 'chatwork', name: 'Chatwork', url: 'https://www.chatwork.com', icon: '📝', enabled: true }
@@ -230,6 +230,14 @@ ipcMain.handle('remove-service', (event, serviceId) => {
 ipcMain.handle('update-service', (event, updatedService) => {
   const services = store.get('services').map(s =>
     s.id === updatedService.id ? updatedService : s
+  );
+  store.set('services', services);
+  return services;
+});
+
+ipcMain.handle('update-service-url', (event, serviceId, url) => {
+  const services = store.get('services').map(s =>
+    s.id === serviceId ? { ...s, url } : s
   );
   store.set('services', services);
   return services;
