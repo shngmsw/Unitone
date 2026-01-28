@@ -75,9 +75,11 @@ jobs:
         run: npm run build:${{ matrix.platform }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # macOS署名・公証用の環境変数
-          CSC_LINK: ${{ matrix.platform == 'mac' && secrets.CSC_LINK || '' }}
-          CSC_KEY_PASSWORD: ${{ matrix.platform == 'mac' && secrets.CSC_KEY_PASSWORD || '' }}
+          # コード署名用の環境変数（macOS: .p12、Windows: .pfx）
+          # electron-builderはCSC_LINKをプラットフォームに応じて自動的に使用
+          CSC_LINK: ${{ (matrix.platform == 'mac' && secrets.CSC_LINK) || (matrix.platform == 'win' && secrets.WIN_CSC_LINK) || '' }}
+          CSC_KEY_PASSWORD: ${{ (matrix.platform == 'mac' && secrets.CSC_KEY_PASSWORD) || (matrix.platform == 'win' && secrets.WIN_CSC_KEY_PASSWORD) || '' }}
+          # macOS公証用の環境変数
           APPLE_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_ID || '' }}
           APPLE_ID_PASSWORD: ${{ matrix.platform == 'mac' && secrets.APPLE_ID_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_TEAM_ID || '' }}

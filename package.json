@@ -23,6 +23,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@electron/notarize": "^3.0.0",
     "electron": "^35.7.5",
     "electron-builder": "^25.0.0",
     "png-to-ico": "^3.0.1",
@@ -30,7 +31,9 @@
     "sharp": "^0.34.5"
   },
   "release": {
-    "branches": ["main"],
+    "branches": [
+      "main"
+    ],
     "plugins": [
       "@semantic-release/commit-analyzer",
       "@semantic-release/release-notes-generator",
@@ -40,6 +43,11 @@
   "build": {
     "appId": "com.unitone.app",
     "productName": "Unitone",
+    "publish": {
+      "provider": "github",
+      "owner": "shngmsw",
+      "repo": "Unitone"
+    },
     "directories": {
       "output": "dist",
       "buildResources": "assets"
@@ -51,7 +59,6 @@
     "mac": {
       "category": "public.app-category.productivity",
       "icon": "assets/icons/512x512.png",
-      "identity": null,
       "target": [
         {
           "target": "dmg",
@@ -71,8 +78,10 @@
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "assets/mac/entitlements.mac.plist",
-      "entitlementsInherit": "assets/mac/entitlements.mac.inherit.plist"
+      "entitlementsInherit": "assets/mac/entitlements.mac.inherit.plist",
+      "notarize": false
     },
+    "afterSign": "scripts/notarize.js",
     "win": {
       "icon": "assets/icons/icon.ico",
       "target": [
@@ -89,7 +98,11 @@
             "x64"
           ]
         }
-      ]
+      ],
+      "signingHashAlgorithms": [
+        "sha256"
+      ],
+      "publisherName": "shngmsw"
     },
     "nsis": {
       "oneClick": false,
@@ -114,6 +127,7 @@
     }
   },
   "dependencies": {
-    "electron-store": "^8.2.0"
+    "electron-store": "^8.2.0",
+    "electron-updater": "^6.7.3"
   }
 }
