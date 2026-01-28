@@ -184,18 +184,41 @@ body.platform-darwin #service-dock {
 }
 
 /* Drag and drop styles */
-.service-item.dragging {
-  opacity: 0.5;
-  cursor: grabbing;
-}
-
-.service-item.drag-over {
-  background: var(--bg-elevated);
-  box-shadow: 0 0 0 2px var(--accent), var(--shadow-md);
-}
-
 .service-item[draggable="true"] {
   cursor: grab;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.service-item.dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+  transform: scale(0.95);
+}
+
+/* ドロップインジケーター - 上 */
+.service-item.drag-over-above::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: -5px;
+  height: 3px;
+  background: var(--accent);
+  border-radius: 2px;
+  z-index: 10;
+}
+
+/* ドロップインジケーター - 下 */
+.service-item.drag-over-below::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: -5px;
+  height: 3px;
+  background: var(--accent);
+  border-radius: 2px;
+  z-index: 10;
 }
 
 /* SHIG #66 操作の近くでフィードバック */
@@ -339,7 +362,13 @@ body.platform-darwin #service-dock {
 }
 
 #ai-companion.resizing {
-  transition: opacity var(--transition-slow);
+  transition: none !important;
+}
+
+/* リサイズ中はすべてのwebviewがマウスイベントを奪わないように */
+body.resizing-active webview,
+body.resizing-active iframe {
+  pointer-events: none !important;
 }
 
 /* リサイズハンドル */

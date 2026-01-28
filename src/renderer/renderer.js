@@ -659,6 +659,7 @@ setupResizeHandle() {
       if (isResizing) {
         isResizing = false;
         aiCompanion.classList.remove('resizing');
+        document.body.classList.remove('resizing-active');
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
 
@@ -680,6 +681,7 @@ setupResizeHandle() {
       startX = e.clientX;
       startWidth = aiCompanion.offsetWidth;
       aiCompanion.classList.add('resizing');
+      document.body.classList.add('resizing-active');
       document.body.style.cursor = 'ew-resize';
       document.body.style.userSelect = 'none';
       e.preventDefault();
@@ -719,7 +721,13 @@ setupResizeHandle() {
   // Drag and drop handlers
   handleDragStart(e) {
     this.draggedElement = e.currentTarget;
-    e.currentTarget.classList.add('dragging');
+    this.dropPosition = null;
+
+    // 少し遅延させてドラッグ開始のスタイルを適用（ブラウザのゴースト画像生成後）
+    requestAnimationFrame(() => {
+      e.currentTarget.classList.add('dragging');
+    });
+
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', e.currentTarget.dataset.serviceId);
   }
@@ -727,17 +735,31 @@ setupResizeHandle() {
   handleDragOver(e) {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+
+    const target = e.currentTarget;
+    if (target === this.draggedElement) {
+      return false;
+    }
+
+    // マウス位置から上半分/下半分を判定
+    const rect = target.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const isAbove = e.clientY < midY;
+
+    // インジケーター位置を更新
+    target.classList.remove('drag-over-above', 'drag-over-below');
+    target.classList.add(isAbove ? 'drag-over-above' : 'drag-over-below');
+    this.dropPosition = isAbove ? 'above' : 'below';
+
     return false;
   }
 
   handleDragEnter(e) {
-    if (e.currentTarget !== this.draggedElement) {
-      e.currentTarget.classList.add('drag-over');
-    }
+    // dragoverで処理するため、ここでは何もしない
   }
 
   handleDragLeave(e) {
-    e.currentTarget.classList.remove('drag-over');
+    e.currentTarget.classList.remove('drag-over-above', 'drag-over-below');
   }
 
   async handleDrop(e) {
@@ -745,7 +767,7 @@ setupResizeHandle() {
     e.preventDefault();
 
     const dropTarget = e.currentTarget;
-    dropTarget.classList.remove('drag-over');
+    dropTarget.classList.remove('drag-over-above', 'drag-over-below');
 
     // nullチェックを追加
     if (!this.draggedElement) {
@@ -759,9 +781,20 @@ setupResizeHandle() {
 
       // Find indices in the services array
       const draggedIndex = this.services.findIndex(s => s.id === draggedId);
-      const targetIndex = this.services.findIndex(s => s.id === targetId);
+      let targetIndex = this.services.findIndex(s => s.id === targetId);
 
       if (draggedIndex !== -1 && targetIndex !== -1) {
+        // ドロップ位置に応じてインデックスを調整
+        // 下にドロップする場合、ターゲットの後に挿入
+        if (this.dropPosition === 'below') {
+          targetIndex += 1;
+        }
+
+        // ドラッグ元が先にある場合、削除後のインデックスを調整
+        if (draggedIndex < targetIndex) {
+          targetIndex -= 1;
+        }
+
         // Reorder the services array
         const [draggedService] = this.services.splice(draggedIndex, 1);
         this.services.splice(targetIndex, 0, draggedService);
@@ -781,12 +814,13 @@ setupResizeHandle() {
   handleDragEnd(e) {
     e.currentTarget.classList.remove('dragging');
 
-    // Remove drag-over class from all items
+    // Remove drag-over classes from all items
     document.querySelectorAll('.service-item').forEach(item => {
-      item.classList.remove('drag-over');
+      item.classList.remove('drag-over-above', 'drag-over-below');
     });
 
     this.draggedElement = null;
+    this.dropPosition = null;
   }
 
   // バッジとアクティブ状態を復元
