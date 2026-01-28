@@ -51,6 +51,7 @@
     "mac": {
       "category": "public.app-category.productivity",
       "icon": "assets/icons/512x512.png",
+      "identity": null,
       "target": [
         {
           "target": "dmg",
