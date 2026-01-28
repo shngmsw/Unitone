@@ -76,32 +76,54 @@ html, body {
   -webkit-app-region: drag;
 }
 
+/* App logo at top of sidebar */
+#app-logo {
+  width: var(--btn-size-lg);
+  height: var(--btn-size-lg);
+  margin: 0 auto var(--space-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-app-region: no-drag;
+}
+
+#app-logo img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  opacity: 0.8;
+}
+
 #service-list {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding-top: 24px; /* タイトルバーボタン用スペース (macOS) */
+  padding-top: 8px;
   -webkit-app-region: no-drag;
 }
 
 /* Windows: タイトルバーオーバーレイ分のスペースを確保 */
-body.platform-win32 #service-list {
-  padding-top: 32px;
-}
-
-/* Windows: ドラッグ領域を上部に設定 */
 body.platform-win32 #service-dock {
   padding-top: 32px;
 }
 
+body.platform-win32 #app-logo {
+  margin-top: 0;
+}
+
 /* Linux: 標準フレームなのでパディング不要 */
-body.platform-linux #service-list {
+body.platform-linux #service-dock {
   padding-top: 8px;
 }
 
-body.platform-linux #service-dock {
-  padding-top: 8px;
+body.platform-linux #app-logo {
+  margin-top: 0;
+}
+
+/* macOS: タイトルバーボタン用スペース */
+body.platform-darwin #service-dock {
+  padding-top: 24px;
 }
 
 .service-item {
