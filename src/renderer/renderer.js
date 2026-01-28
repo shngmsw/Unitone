@@ -8,6 +8,8 @@ class Unitone {
     this.badges = new Map();
     this.loadingTimer = null;
     this.initialLoadDone = new Set();
+    this.faviconExtracted = new Set(); // Track services with extracted favicons
+    this.draggedElement = null;
 
     this.init();
   }
@@ -21,6 +23,7 @@ class Unitone {
     this.services = await window.unitone.getServices();
     this.activeServiceId = await window.unitone.getActiveService();
     const showAiCompanion = await window.unitone.getShowAiCompanion();
+    const aiWidth = await window.unitone.getAiWidth();
 
     // サービスドックを構築
     this.renderServiceDock();
@@ -29,10 +32,13 @@ class Unitone {
     this.createWebViews();
 
     // AIコンパニオンを設定
-    await this.setupAiCompanion(showAiCompanion);
+    await this.setupAiCompanion(showAiCompanion, aiWidth);
 
     // イベントリスナーを設定
     this.setupEventListeners();
+
+    // リサイズハンドルを設定
+    this.setupResizeHandle();
 
     // バッジ更新をリッスン
     window.unitone.onBadgeUpdated(({ serviceId, count }) => {
@@ -66,12 +72,34 @@ class Unitone {
       item.className = 'service-item';
       item.dataset.serviceId = service.id;
       item.title = service.name;
-      item.innerHTML = `
-        ${service.icon}
-        <span class="badge hidden">0</span>
-      `;
+      item.draggable = true;
+
+      // Use favicon if available, otherwise use emoji
+      if (service.faviconUrl) {
+        const img = document.createElement('img');
+        img.className = 'service-favicon';
+        img.src = service.faviconUrl;
+        img.alt = service.name;
+        item.appendChild(img);
+      } else {
+        item.textContent = service.icon;
+      }
+
+      const badge = document.createElement('span');
+      badge.className = 'badge hidden';
+      badge.textContent = '0';
+      item.appendChild(badge);
 
       item.addEventListener('click', () => this.switchService(service.id));
+
+      // Drag and drop event listeners
+      item.addEventListener('dragstart', (e) => this.handleDragStart(e));
+      item.addEventListener('dragover', (e) => this.handleDragOver(e));
+      item.addEventListener('drop', (e) => this.handleDrop(e));
+      item.addEventListener('dragend', (e) => this.handleDragEnd(e));
+      item.addEventListener('dragenter', (e) => this.handleDragEnter(e));
+      item.addEventListener('dragleave', (e) => this.handleDragLeave(e));
+
       serviceList.appendChild(item);
     });
   }
@@ -89,9 +117,20 @@ class Unitone {
 
       // DOM準備完了時
       webview.addEventListener('dom-ready', () => {
+        // サービスIDをwebviewに送信（JSON.stringifyでエスケープしてXSS対策）
+        const serviceIdJson = JSON.stringify(service.id);
+        webview.executeJavaScript(`
+          window.postMessage({ type: 'set-service-id', serviceId: ${serviceIdJson} }, '*');
+        `);
+        
         this.initialLoadDone.add(service.id);
         if (this.activeServiceId === service.id) {
           this.hideLoading();
+        }
+        
+        // Extract favicon from the loaded page (only once per service)
+        if (!this.faviconExtracted.has(service.id)) {
+          this.extractFavicon(webview, service.id);
         }
       });
 
@@ -175,10 +214,18 @@ class Unitone {
     window.unitone.setActiveService(serviceId);
   }
 
-  async setupAiCompanion(show) {
+  async setupAiCompanion(show, width) {
     const aiCompanion = document.getElementById('ai-companion');
     const aiWebview = document.getElementById('ai-webview');
     const geminiUrl = await window.unitone.getGeminiUrl();
+
+    // 幅を設定（300-800pxの範囲でバリデーション）
+    if (width) {
+      const minWidth = 300;
+      const maxWidth = 800;
+      const validWidth = Math.max(minWidth, Math.min(maxWidth, width));
+      aiCompanion.style.width = `${validWidth}px`;
+    }
 
     if (show) {
       aiCompanion.classList.remove('hidden');
@@ -216,6 +263,17 @@ class Unitone {
     const webview = this.webviews.get(this.activeServiceId);
     if (webview && url) {
       webview.src = url;
+      
+      // Slackの場合、認証後のURLを保存する
+      // Format: https://app.slack.com/client/XXXXXXXXX/XXXXXXXXX
+      if (this.activeServiceId === 'slack' && url.includes('app.slack.com/client/')) {
+        window.unitone.updateServiceUrl('slack', url).then(() => {
+          // URLが更新されたらサービスリストを再読み込み
+          window.unitone.getServices().then(services => {
+            this.services = services;
+          });
+        });
+      }
     } else if (webview) {
       webview.reload();
     }
@@ -308,6 +366,86 @@ class Unitone {
       this.loadingTimer = null;
     }
     document.getElementById('loading-indicator').classList.add('hidden');
+  }
+
+  async extractFavicon(webview, serviceId) {
+    try {
+      // Execute script in webview to get favicon URL
+      const faviconUrl = await webview.executeJavaScript(`
+        (function() {
+          // Try different selectors for favicon
+          const selectors = [
+            'link[rel="icon"]',
+            'link[rel="shortcut icon"]',
+            'link[rel="apple-touch-icon"]',
+            'link[rel="apple-touch-icon-precomposed"]'
+          ];
+          
+          for (const selector of selectors) {
+            const link = document.querySelector(selector);
+            if (link && link.href) {
+              return link.href;
+            }
+          }
+          
+          // Return null if no favicon found (don't fallback to /favicon.ico)
+          return null;
+        })();
+      `);
+
+      if (faviconUrl && this.isValidFaviconUrl(faviconUrl)) {
+        // Mark as extracted to prevent repeated attempts
+        this.faviconExtracted.add(serviceId);
+        
+        // Update service with favicon URL
+        const service = this.services.find(s => s.id === serviceId);
+        if (service && service.faviconUrl !== faviconUrl) {
+          service.faviconUrl = faviconUrl;
+          await window.unitone.updateService(service);
+          
+          // Update only this service's icon instead of re-rendering entire dock
+          this.updateServiceIcon(serviceId, faviconUrl);
+        }
+      }
+    } catch (error) {
+      console.warn(`Failed to extract favicon for ${serviceId}:`, error);
+      // Mark as extracted to prevent retrying on every dom-ready
+      this.faviconExtracted.add(serviceId);
+    }
+  }
+
+  isValidFaviconUrl(url) {
+    try {
+      const parsedUrl = new URL(url);
+      // Only allow http, https, and data URLs (not javascript:)
+      return ['http:', 'https:', 'data:'].includes(parsedUrl.protocol);
+    } catch {
+      return false;
+    }
+  }
+
+  updateServiceIcon(serviceId, faviconUrl) {
+    const item = document.querySelector(`.service-item[data-service-id="${serviceId}"]`);
+    if (item) {
+      // Remove old icon (emoji or old favicon)
+      const oldIcon = item.querySelector('.service-favicon') || item.firstChild;
+      if (oldIcon && oldIcon.nodeType === Node.TEXT_NODE) {
+        oldIcon.remove();
+      } else if (oldIcon && oldIcon.classList && oldIcon.classList.contains('service-favicon')) {
+        oldIcon.remove();
+      }
+      
+      // Add new favicon
+      const img = document.createElement('img');
+      img.className = 'service-favicon';
+      img.src = faviconUrl;
+      const service = this.services.find(s => s.id === serviceId);
+      img.alt = service ? service.name : '';
+      
+      // Insert before badge
+      const badge = item.querySelector('.badge');
+      item.insertBefore(img, badge);
+    }
   }
 
   setupEventListeners() {
@@ -479,6 +617,192 @@ class Unitone {
     document.getElementById('edit-service-icon').value = service.icon;
 
     document.getElementById('edit-service-modal').classList.remove('hidden');
+  }
+
+setupResizeHandle() {
+    const resizeHandle = document.getElementById('resize-handle');
+    const aiCompanion = document.getElementById('ai-companion');
+
+    // 要素が存在しない場合は早期リターン
+    if (!resizeHandle || !aiCompanion) {
+      return;
+    }
+
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+    let animationFrameId = null;
+
+    // CSS変数から最小・最大幅を取得
+    const computedStyle = getComputedStyle(document.documentElement);
+    const minWidth = parseInt(computedStyle.getPropertyValue('--ai-min-width')) || 300;
+    const maxWidth = parseInt(computedStyle.getPropertyValue('--ai-max-width')) || 800;
+
+    const onMouseMove = (e) => {
+      if (!isResizing || aiCompanion.classList.contains('hidden')) return;
+
+      // requestAnimationFrameでパフォーマンス最適化
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+
+      animationFrameId = requestAnimationFrame(() => {
+        // 右から左へのドラッグなので、差分を反転
+        const deltaX = startX - e.clientX;
+        const newWidth = Math.max(minWidth, Math.min(maxWidth, startWidth + deltaX));
+
+        aiCompanion.style.width = `${newWidth}px`;
+      });
+    };
+
+    const onMouseUp = () => {
+      if (isResizing) {
+        isResizing = false;
+        aiCompanion.classList.remove('resizing');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+
+        // 現在の幅を保存
+        const currentWidth = aiCompanion.offsetWidth;
+        window.unitone.setAiWidth(currentWidth).catch(err => {
+          console.warn('AI幅の保存に失敗しました:', err);
+        });
+      }
+    };
+
+    resizeHandle.addEventListener('mousedown', (e) => {
+      // 非表示の場合はリサイズを許可しない
+      if (aiCompanion.classList.contains('hidden')) {
+        return;
+      }
+
+      isResizing = true;
+      startX = e.clientX;
+      startWidth = aiCompanion.offsetWidth;
+      aiCompanion.classList.add('resizing');
+      document.body.style.cursor = 'ew-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+
+    // キーボードアクセシビリティ: 矢印キーでリサイズ
+    resizeHandle.addEventListener('keydown', (e) => {
+      if (aiCompanion.classList.contains('hidden')) return;
+
+      const step = 10; // 1回のキー押下で10px変更
+      let currentWidth = aiCompanion.offsetWidth;
+      let newWidth = currentWidth;
+
+      if (e.key === 'ArrowLeft') {
+        // 左矢印: 幅を広げる
+        newWidth = Math.min(maxWidth, currentWidth + step);
+        e.preventDefault();
+      } else if (e.key === 'ArrowRight') {
+        // 右矢印: 幅を狭める
+        newWidth = Math.max(minWidth, currentWidth - step);
+        e.preventDefault();
+      }
+
+      if (newWidth !== currentWidth) {
+        aiCompanion.style.width = `${newWidth}px`;
+        // 幅を保存
+        window.unitone.setAiWidth(newWidth).catch(err => {
+          console.warn('AI幅の保存に失敗しました:', err);
+        });
+      }
+    });
+  }
+
+  // Drag and drop handlers
+  handleDragStart(e) {
+    this.draggedElement = e.currentTarget;
+    e.currentTarget.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', e.currentTarget.dataset.serviceId);
+  }
+
+  handleDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    return false;
+  }
+
+  handleDragEnter(e) {
+    if (e.currentTarget !== this.draggedElement) {
+      e.currentTarget.classList.add('drag-over');
+    }
+  }
+
+  handleDragLeave(e) {
+    e.currentTarget.classList.remove('drag-over');
+  }
+
+  async handleDrop(e) {
+    e.stopPropagation();
+    e.preventDefault();
+
+    const dropTarget = e.currentTarget;
+    dropTarget.classList.remove('drag-over');
+
+    // nullチェックを追加
+    if (!this.draggedElement) {
+      return false;
+    }
+
+    if (this.draggedElement !== dropTarget) {
+      // Get the service IDs
+      const draggedId = this.draggedElement.dataset.serviceId;
+      const targetId = dropTarget.dataset.serviceId;
+
+      // Find indices in the services array
+      const draggedIndex = this.services.findIndex(s => s.id === draggedId);
+      const targetIndex = this.services.findIndex(s => s.id === targetId);
+
+      if (draggedIndex !== -1 && targetIndex !== -1) {
+        // Reorder the services array
+        const [draggedService] = this.services.splice(draggedIndex, 1);
+        this.services.splice(targetIndex, 0, draggedService);
+
+        // Save the new order and wait for it to complete
+        await window.unitone.reorderServices(this.services);
+
+        // Re-render the service dock (バッジとアクティブ状態を保持)
+        this.renderServiceDock();
+        this.restoreBadgesAndActiveState();
+      }
+    }
+
+    return false;
+  }
+
+  handleDragEnd(e) {
+    e.currentTarget.classList.remove('dragging');
+
+    // Remove drag-over class from all items
+    document.querySelectorAll('.service-item').forEach(item => {
+      item.classList.remove('drag-over');
+    });
+
+    this.draggedElement = null;
+  }
+
+  // バッジとアクティブ状態を復元
+  restoreBadgesAndActiveState() {
+    // バッジを復元
+    this.badges.forEach((count, serviceId) => {
+      this.updateBadge(serviceId, count);
+    });
+
+    // アクティブ状態を復元
+    if (this.activeServiceId) {
+      const activeItem = document.querySelector(`.service-item[data-service-id="${this.activeServiceId}"]`);
+      if (activeItem) {
+        activeItem.classList.add('active');
+      }
+    }
   }
 }
 

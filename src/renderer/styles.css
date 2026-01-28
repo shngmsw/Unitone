@@ -8,6 +8,8 @@
   /* レイアウト */
   --dock-width: 64px;
   --ai-width: 400px;
+  --ai-min-width: 300px;
+  --ai-max-width: 800px;
 
   /* スペーシング（8pxグリッド） - SHIG #85 整然とレイアウト */
   --space-xs: 4px;
@@ -76,32 +78,54 @@ html, body {
   -webkit-app-region: drag;
 }
 
+/* App logo at top of sidebar */
+#app-logo {
+  width: var(--btn-size-lg);
+  height: var(--btn-size-lg);
+  margin: 0 auto var(--space-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-app-region: no-drag;
+}
+
+#app-logo img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  opacity: 0.8;
+}
+
 #service-list {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding-top: 24px; /* タイトルバーボタン用スペース (macOS) */
+  padding-top: 8px;
   -webkit-app-region: no-drag;
 }
 
 /* Windows: タイトルバーオーバーレイ分のスペースを確保 */
-body.platform-win32 #service-list {
-  padding-top: 32px;
-}
-
-/* Windows: ドラッグ領域を上部に設定 */
 body.platform-win32 #service-dock {
   padding-top: 32px;
 }
 
+body.platform-win32 #app-logo {
+  margin-top: 0;
+}
+
 /* Linux: 標準フレームなのでパディング不要 */
-body.platform-linux #service-list {
+body.platform-linux #service-dock {
   padding-top: 8px;
 }
 
-body.platform-linux #service-dock {
-  padding-top: 8px;
+body.platform-linux #app-logo {
+  margin-top: 0;
+}
+
+/* macOS: タイトルバーボタン用スペース */
+body.platform-darwin #service-dock {
+  padding-top: 24px;
 }
 
 .service-item {
@@ -122,6 +146,12 @@ body.platform-linux #service-dock {
   box-shadow: var(--shadow-sm);
   /* SHIG #93 ホットスポット拡大のためにパディングで広げる */
   padding: 0;
+}
+
+.service-item .service-favicon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
 }
 
 /* SHIG #74 ハイライト表現は構成要素を1つだけ変化 */
@@ -151,6 +181,21 @@ body.platform-linux #service-dock {
   height: 24px;
   background: var(--accent);
   border-radius: 2px;
+}
+
+/* Drag and drop styles */
+.service-item.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.service-item.drag-over {
+  background: var(--bg-elevated);
+  box-shadow: 0 0 0 2px var(--accent), var(--shadow-md);
+}
+
+.service-item[draggable="true"] {
+  cursor: grab;
 }
 
 /* SHIG #66 操作の近くでフィードバック */
@@ -284,12 +329,39 @@ body.platform-linux #service-dock {
   flex-direction: column;
   transition: width var(--transition-slow),
               opacity var(--transition-slow);
+  position: relative;
 }
 
 #ai-companion.hidden {
-  width: 0;
+  width: 0 !important;
   opacity: 0;
   overflow: hidden;
+}
+
+#ai-companion.resizing {
+  transition: opacity var(--transition-slow);
+}
+
+/* リサイズハンドル */
+#resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+  z-index: 10;
+  background: transparent;
+  transition: background-color var(--transition-fast);
+}
+
+#resize-handle:hover {
+  background: var(--accent-subtle);
+}
+
+#resize-handle:active,
+#ai-companion.resizing #resize-handle {
+  background: var(--accent);
 }
 
 #ai-header {

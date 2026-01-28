@@ -11,7 +11,7 @@ const isLinux = process.platform === 'linux';
 const store = new Store({
   defaults: {
     services: [
-      { id: 'slack', name: 'Slack', url: 'https://slack.com/signin', icon: '💬', enabled: true },
+      { id: 'slack', name: 'Slack', url: 'https://app.slack.com', icon: '💬', enabled: true },
       { id: 'gchat', name: 'Google Chat', url: 'https://chat.google.com', icon: '💭', enabled: true },
       { id: 'teams', name: 'Teams', url: 'https://teams.microsoft.com', icon: '👥', enabled: true },
       { id: 'chatwork', name: 'Chatwork', url: 'https://www.chatwork.com', icon: '📝', enabled: true }
@@ -19,7 +19,8 @@ const store = new Store({
     geminiUrl: 'https://gemini.google.com',
     windowBounds: { width: 1400, height: 900 },
     activeServiceId: 'slack',
-    showAiCompanion: true
+    showAiCompanion: true,
+    aiWidth: 400
   }
 });
 
@@ -218,6 +219,11 @@ ipcMain.handle('add-service', (event, service) => {
   };
   services.push(newService);
   store.set('services', services);
+  
+  // 新しいサービスのセッションにプリロードスクリプトを設定
+  const ses = session.fromPartition(`persist:${newService.id}`);
+  ses.setPreloads([path.join(__dirname, '../preload/webview-preload.js')]);
+  
   return services;
 });
 
@@ -230,6 +236,70 @@ ipcMain.handle('remove-service', (event, serviceId) => {
 ipcMain.handle('update-service', (event, updatedService) => {
   const services = store.get('services').map(s =>
     s.id === updatedService.id ? updatedService : s
+  );
+  store.set('services', services);
+  return services;
+});
+
+ipcMain.handle('reorder-services', (event, reorderedServices) => {
+  // Validate input
+  if (!Array.isArray(reorderedServices)) {
+    console.error('Invalid reorder-services request: not an array');
+    return store.get('services');
+  }
+
+  const currentServices = store.get('services');
+
+  // Validate that all services have required properties
+  const isValid = reorderedServices.every(service =>
+    service &&
+    typeof service.id === 'string' &&
+    typeof service.name === 'string' &&
+    typeof service.url === 'string' &&
+    typeof service.icon === 'string' &&
+    typeof service.enabled === 'boolean'
+  );
+
+  if (!isValid) {
+    console.error('Invalid reorder-services request: missing or invalid properties');
+    return currentServices;
+  }
+
+  // Validate that we have the same set of service IDs
+  const currentIds = currentServices.map(s => s.id).sort();
+  const reorderedIds = reorderedServices.map(s => s.id).sort();
+
+  if (currentIds.length !== reorderedIds.length ||
+      !currentIds.every((id, index) => id === reorderedIds[index])) {
+    console.error('Invalid reorder-services request: service IDs do not match');
+    return currentServices;
+  }
+
+  store.set('services', reorderedServices);
+  return reorderedServices;
+});
+
+ipcMain.handle('update-service-url', (event, serviceId, url) => {
+  // URLバリデーション
+  if (typeof serviceId !== 'string' || typeof url !== 'string') {
+    console.error('Invalid update-service-url request: invalid parameters');
+    return store.get('services');
+  }
+
+  try {
+    const parsedUrl = new URL(url);
+    // http/httpsのみ許可
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      console.error('Invalid update-service-url request: invalid protocol');
+      return store.get('services');
+    }
+  } catch {
+    console.error('Invalid update-service-url request: invalid URL format');
+    return store.get('services');
+  }
+
+  const services = store.get('services').map(s =>
+    s.id === serviceId ? { ...s, url } : s
   );
   store.set('services', services);
   return services;
@@ -255,6 +325,20 @@ ipcMain.handle('get-show-ai-companion', () => {
 ipcMain.handle('set-show-ai-companion', (event, show) => {
   store.set('showAiCompanion', show);
   return show;
+});
+
+ipcMain.handle('get-ai-width', () => {
+  return store.get('aiWidth', 400);
+});
+
+ipcMain.handle('set-ai-width', (event, width) => {
+  // 幅のバリデーション（300-800px）
+  if (typeof width !== 'number' || isNaN(width) || width < 300 || width > 800) {
+    console.warn('Invalid AI width:', width);
+    return store.get('aiWidth', 400);
+  }
+  store.set('aiWidth', width);
+  return width;
 });
 
 // 通知バッジ更新
@@ -363,6 +447,17 @@ ipcMain.handle('get-platform', () => {
 
 // アプリ起動
 app.whenReady().then(() => {
+  // WebView用のプリロードスクリプトを設定
+  const services = store.get('services');
+  services.forEach(service => {
+    const ses = session.fromPartition(`persist:${service.id}`);
+    ses.setPreloads([path.join(__dirname, '../preload/webview-preload.js')]);
+  });
+  
+  // Gemini用のセッションにもプリロードを設定
+  const geminiSession = session.fromPartition('persist:gemini');
+  geminiSession.setPreloads([path.join(__dirname, '../preload/webview-preload.js')]);
+  
   createWindow();
   createTray();
 
