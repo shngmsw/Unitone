@@ -10,6 +10,7 @@ Unitoneは、Slack、Google Chat、Microsoft Teams、Chatworkなど、複数の�
 
 - **マルチサービス対応**: Slack、Google Chat、Teams、Chatworkをサポート
 - **カスタムサービス追加**: 任意のWebベースチャットサービスを追加可能
+- **サービスの並べ替え**: ドラッグ&ドロップでサービスの順序を自由に変更可能
 - **AIコンパニオン**: Geminiを使用したAIアシスタント機能
 - **クロスプラットフォーム**: macOS、Windows、Linuxに対応
 - **システムトレイ**: バックグラウンド動作対応
