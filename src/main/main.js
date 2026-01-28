@@ -16,7 +16,12 @@ const store = new Store({
       { id: 'teams', name: 'Teams', url: 'https://teams.microsoft.com', icon: '👥', enabled: true },
       { id: 'chatwork', name: 'Chatwork', url: 'https://www.chatwork.com', icon: '📝', enabled: true }
     ],
-    geminiUrl: 'https://gemini.google.com',
+    aiServices: [
+      { id: 'gemini', name: 'Gemini', url: 'https://gemini.google.com', isDefault: true },
+      { id: 'chatgpt', name: 'ChatGPT', url: 'https://chat.openai.com', isDefault: true },
+      { id: 'claude', name: 'Claude', url: 'https://claude.ai', isDefault: true }
+    ],
+    activeAiServiceId: 'gemini',
     windowBounds: { width: 1400, height: 900 },
     activeServiceId: 'slack',
     showAiCompanion: true,
@@ -341,6 +346,61 @@ ipcMain.handle('set-ai-width', (event, width) => {
   return width;
 });
 
+// AIサービス関連
+ipcMain.handle('get-ai-services', () => {
+  return store.get('aiServices');
+});
+
+ipcMain.handle('get-active-ai-service', () => {
+  const activeId = store.get('activeAiServiceId');
+  const services = store.get('aiServices');
+  return services.find(s => s.id === activeId) || services[0];
+});
+
+ipcMain.handle('set-active-ai-service', (event, serviceId) => {
+  const services = store.get('aiServices');
+  const service = services.find(s => s.id === serviceId);
+  if (service) {
+    store.set('activeAiServiceId', serviceId);
+    return service;
+  }
+  return null;
+});
+
+ipcMain.handle('add-ai-service', (event, service) => {
+  const services = store.get('aiServices');
+  const newService = {
+    id: `ai-${Date.now()}`,
+    name: service.name,
+    url: service.url,
+    isDefault: false
+  };
+  services.push(newService);
+  store.set('aiServices', services);
+  return services;
+});
+
+ipcMain.handle('remove-ai-service', (event, serviceId) => {
+  let services = store.get('aiServices');
+  const service = services.find(s => s.id === serviceId);
+
+  // デフォルトのサービスは削除不可
+  if (service && service.isDefault) {
+    return services;
+  }
+
+  services = services.filter(s => s.id !== serviceId);
+  store.set('aiServices', services);
+
+  // 削除したサービスがアクティブだった場合、最初のサービスをアクティブに
+  const activeId = store.get('activeAiServiceId');
+  if (activeId === serviceId && services.length > 0) {
+    store.set('activeAiServiceId', services[0].id);
+  }
+
+  return services;
+});
+
 // 通知バッジ更新
 let totalBadgeCount = 0;
 const serviceBadgeCounts = {};
@@ -579,10 +639,10 @@ app.on('web-contents-created', (event, contents) => {
           }
         },
         {
-          label: 'Geminiに送る',
+          label: 'AIに送る',
           click: () => {
             if (mainWindow) {
-              mainWindow.webContents.send('send-to-gemini', params.selectionText);
+              mainWindow.webContents.send('send-to-ai', params.selectionText);
             }
           }
         },

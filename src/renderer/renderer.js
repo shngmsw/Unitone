@@ -10,6 +10,8 @@ class Unitone {
     this.initialLoadDone = new Set();
     this.faviconExtracted = new Set(); // Track services with extracted favicons
     this.draggedElement = null;
+    this.aiServices = [];
+    this.activeAiService = null;
 
     this.init();
   }
@@ -22,6 +24,8 @@ class Unitone {
     // 設定を読み込み
     this.services = await window.unitone.getServices();
     this.activeServiceId = await window.unitone.getActiveService();
+    this.aiServices = await window.unitone.getAiServices();
+    this.activeAiService = await window.unitone.getActiveAiService();
     const showAiCompanion = await window.unitone.getShowAiCompanion();
     const aiWidth = await window.unitone.getAiWidth();
 
@@ -45,9 +49,9 @@ class Unitone {
       this.updateBadge(serviceId, count);
     });
 
-    // Geminiに送るをリッスン
-    window.unitone.onSendToGemini((text) => {
-      this.sendToGemini(text);
+    // AIに送るをリッスン
+    window.unitone.onSendToAi((text) => {
+      this.sendToAi(text);
     });
 
     // 認証完了時にアクティブなwebviewを認証後のURLにナビゲート
@@ -212,7 +216,6 @@ class Unitone {
   async setupAiCompanion(show, width) {
     const aiCompanion = document.getElementById('ai-companion');
     const aiWebview = document.getElementById('ai-webview');
-    const geminiUrl = await window.unitone.getGeminiUrl();
 
     // 幅を設定（300-800pxの範囲でバリデーション）
     if (width) {
@@ -222,10 +225,14 @@ class Unitone {
       aiCompanion.style.width = `${validWidth}px`;
     }
 
+    // AIセレクターを初期化
+    this.renderAiDropdown();
+    this.updateAiSelectorDisplay();
+
     if (show) {
       aiCompanion.classList.remove('hidden');
-      if (aiWebview.src === 'about:blank') {
-        aiWebview.src = geminiUrl;
+      if (aiWebview.src === 'about:blank' && this.activeAiService) {
+        aiWebview.src = this.activeAiService.url;
       }
     } else {
       aiCompanion.classList.add('hidden');
@@ -239,11 +246,83 @@ class Unitone {
 
     if (!isHidden) {
       const aiWebview = document.getElementById('ai-webview');
-      if (aiWebview.src === 'about:blank') {
-        window.unitone.getGeminiUrl().then(url => {
-          aiWebview.src = url;
-        });
+      if (aiWebview.src === 'about:blank' && this.activeAiService) {
+        aiWebview.src = this.activeAiService.url;
       }
+    }
+  }
+
+  // AIセレクターの表示を更新
+  updateAiSelectorDisplay() {
+    const nameElement = document.getElementById('ai-current-name');
+    if (nameElement && this.activeAiService) {
+      nameElement.textContent = this.activeAiService.name;
+    }
+  }
+
+  // AIドロップダウンを描画
+  renderAiDropdown() {
+    const list = document.getElementById('ai-dropdown-list');
+    if (!list) return;
+
+    list.innerHTML = this.aiServices.map(service => {
+      const isActive = this.activeAiService && service.id === this.activeAiService.id;
+      const deleteBtn = service.isDefault ? '' : `<button class="delete-ai-btn" data-id="${service.id}" title="削除">×</button>`;
+      return `
+        <div class="ai-dropdown-item ${isActive ? 'active' : ''}" data-id="${service.id}">
+          <span>${service.name}</span>
+          ${deleteBtn}
+        </div>
+      `;
+    }).join('');
+
+    // クリックイベントを設定
+    list.querySelectorAll('.ai-dropdown-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        if (e.target.classList.contains('delete-ai-btn')) return;
+        this.switchAiService(item.dataset.id);
+      });
+    });
+
+    // 削除ボタンのイベント
+    list.querySelectorAll('.delete-ai-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await this.removeAiService(btn.dataset.id);
+      });
+    });
+  }
+
+  // AIサービスを切り替え
+  async switchAiService(serviceId) {
+    const service = this.aiServices.find(s => s.id === serviceId);
+    if (!service) return;
+
+    this.activeAiService = await window.unitone.setActiveAiService(serviceId);
+    this.updateAiSelectorDisplay();
+    this.renderAiDropdown();
+    this.toggleAiDropdown(false);
+
+    // webviewを更新
+    const aiWebview = document.getElementById('ai-webview');
+    aiWebview.src = service.url;
+  }
+
+  // AIサービスを削除
+  async removeAiService(serviceId) {
+    this.aiServices = await window.unitone.removeAiService(serviceId);
+    this.activeAiService = await window.unitone.getActiveAiService();
+    this.renderAiDropdown();
+    this.updateAiSelectorDisplay();
+  }
+
+  // AIドロップダウンの表示/非表示
+  toggleAiDropdown(show = null) {
+    const dropdown = document.getElementById('ai-dropdown');
+    if (show === null) {
+      dropdown.classList.toggle('hidden');
+    } else {
+      dropdown.classList.toggle('hidden', !show);
     }
   }
 
@@ -274,7 +353,7 @@ class Unitone {
     }
   }
 
-  sendToGemini(text) {
+  sendToAi(text) {
     // AIコンパニオンを表示
     const aiCompanion = document.getElementById('ai-companion');
     if (aiCompanion.classList.contains('hidden')) {
@@ -283,12 +362,12 @@ class Unitone {
 
     const aiWebview = document.getElementById('ai-webview');
 
-    // Geminiが読み込まれるのを待ってからテキストを入力
+    // AIが読み込まれるのを待ってからテキストを入力
     const tryInsertText = () => {
-      // Geminiの入力欄にテキストを挿入するスクリプト
+      // AIの入力欄にテキストを挿入するスクリプト
       aiWebview.executeJavaScript(`
         (function() {
-          // Geminiの入力欄を探す
+          // 入力欄を探す（各AIサービスで共通のセレクター）
           const textareas = document.querySelectorAll('textarea, [contenteditable="true"], .ql-editor, [role="textbox"]');
           for (const el of textareas) {
             if (el.offsetParent !== null) { // 可視要素のみ
@@ -307,12 +386,12 @@ class Unitone {
         })();
       `).then(result => {
         if (!result) {
-          console.log('Geminiの入力欄が見つかりませんでした。クリップボードにコピーしました。');
+          console.log('AIの入力欄が見つかりませんでした。クリップボードにコピーしました。');
           // フォールバック：クリップボードにコピー
           navigator.clipboard.writeText(text);
         }
       }).catch(err => {
-        console.error('Geminiへの送信に失敗:', err);
+        console.error('AIへの送信に失敗:', err);
         navigator.clipboard.writeText(text);
       });
     };
@@ -461,6 +540,45 @@ class Unitone {
   }
 
   setupEventListeners() {
+    // AIセレクターボタン
+    document.getElementById('ai-selector-btn').addEventListener('click', () => {
+      this.toggleAiDropdown();
+    });
+
+    // AI追加ボタン
+    document.getElementById('add-ai-btn').addEventListener('click', () => {
+      this.toggleAiDropdown(false);
+      document.getElementById('add-ai-modal').classList.remove('hidden');
+    });
+
+    // AI追加キャンセル
+    document.getElementById('cancel-add-ai-btn').addEventListener('click', () => {
+      document.getElementById('add-ai-modal').classList.add('hidden');
+      document.getElementById('add-ai-form').reset();
+    });
+
+    // AI追加フォーム送信
+    document.getElementById('add-ai-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('ai-name').value;
+      const url = document.getElementById('ai-url').value;
+
+      this.aiServices = await window.unitone.addAiService({ name, url });
+      this.renderAiDropdown();
+
+      document.getElementById('add-ai-modal').classList.add('hidden');
+      document.getElementById('add-ai-form').reset();
+    });
+
+    // ドロップダウン外クリックで閉じる
+    document.addEventListener('click', (e) => {
+      const selector = document.getElementById('ai-selector');
+      const dropdown = document.getElementById('ai-dropdown');
+      if (selector && !selector.contains(e.target) && !dropdown.classList.contains('hidden')) {
+        this.toggleAiDropdown(false);
+      }
+    });
+
     // サービス追加ボタン
     document.getElementById('add-service-btn').addEventListener('click', () => {
       document.getElementById('add-service-modal').classList.remove('hidden');

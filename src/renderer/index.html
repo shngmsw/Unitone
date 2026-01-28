@@ -8,6 +8,11 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <!-- アプリヘッダー（ドラッグでウィンドウ移動可能） -->
+  <header id="app-header">
+    <span class="app-title">Unitone</span>
+  </header>
+
   <div id="app">
     <!-- L1: サービスドック -->
     <aside id="service-dock">
@@ -35,10 +40,19 @@
     <aside id="ai-companion" class="hidden">
       <div id="resize-handle" title="ドラッグして幅を変更" tabindex="0" role="separator" aria-orientation="vertical" aria-label="サイドバーの幅を変更"></div>
       <div id="ai-header">
-        <span>Gemini</span>
+        <div id="ai-selector">
+          <button id="ai-selector-btn" title="AIを切り替え">
+            <span id="ai-current-name">Gemini</span>
+            <span class="dropdown-arrow">▼</span>
+          </button>
+          <div id="ai-dropdown" class="hidden">
+            <div id="ai-dropdown-list"></div>
+            <button id="add-ai-btn" class="dropdown-add-btn">+ AIを追加</button>
+          </div>
+        </div>
         <button id="close-ai-btn" title="閉じる">×</button>
       </div>
-      <webview id="ai-webview" src="about:blank" partition="persist:gemini"></webview>
+      <webview id="ai-webview" src="about:blank" partition="persist:ai"></webview>
     </aside>
   </div>
 
@@ -100,6 +114,27 @@
         <div class="form-actions">
           <button type="button" id="cancel-edit-btn">キャンセル</button>
           <button type="submit">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- AI追加モーダル -->
+  <div id="add-ai-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2>AIサービスを追加</h2>
+      <form id="add-ai-form">
+        <div class="form-group">
+          <label for="ai-name">名前</label>
+          <input type="text" id="ai-name" required placeholder="例: Perplexity">
+        </div>
+        <div class="form-group">
+          <label for="ai-url">URL</label>
+          <input type="url" id="ai-url" required placeholder="https://perplexity.ai">
+        </div>
+        <div class="form-actions">
+          <button type="button" id="cancel-add-ai-btn">キャンセル</button>
+          <button type="submit">追加</button>
         </div>
       </form>
     </div>

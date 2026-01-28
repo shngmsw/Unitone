@@ -15,11 +15,17 @@ contextBridge.exposeInMainWorld('unitone', {
   setActiveService: (serviceId) => ipcRenderer.invoke('set-active-service', serviceId),
 
   // AIコンパニオン
-  getGeminiUrl: () => ipcRenderer.invoke('get-gemini-url'),
   getShowAiCompanion: () => ipcRenderer.invoke('get-show-ai-companion'),
   setShowAiCompanion: (show) => ipcRenderer.invoke('set-show-ai-companion', show),
   getAiWidth: () => ipcRenderer.invoke('get-ai-width'),
   setAiWidth: (width) => ipcRenderer.invoke('set-ai-width', width),
+
+  // AIサービス管理
+  getAiServices: () => ipcRenderer.invoke('get-ai-services'),
+  getActiveAiService: () => ipcRenderer.invoke('get-active-ai-service'),
+  setActiveAiService: (serviceId) => ipcRenderer.invoke('set-active-ai-service', serviceId),
+  addAiService: (service) => ipcRenderer.invoke('add-ai-service', service),
+  removeAiService: (serviceId) => ipcRenderer.invoke('remove-ai-service', serviceId),
 
   // 通知バッジ
   updateBadge: (serviceId, count) => ipcRenderer.send('update-badge', { serviceId, count }),
@@ -27,9 +33,9 @@ contextBridge.exposeInMainWorld('unitone', {
     ipcRenderer.on('badge-updated', (event, data) => callback(data));
   },
 
-  // Geminiに送る
-  onSendToGemini: (callback) => {
-    ipcRenderer.on('send-to-gemini', (event, text) => callback(text));
+  // AIに送る
+  onSendToAi: (callback) => {
+    ipcRenderer.on('send-to-ai', (event, text) => callback(text));
   },
 
   // 認証完了
