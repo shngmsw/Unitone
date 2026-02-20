@@ -9,6 +9,18 @@ const serviceMainUrls = [
   'www.chatwork.com'
 ];
 
+// 認証関連のドメイン（これらのドメインは認証ポップアップで開く）
+const authDomains = [
+  'accounts.google.com',
+  'login.microsoftonline.com',
+  'login.live.com',
+  'login.windows.net',
+  'aadcdn.msftauth.net',
+  'aadcdn.msauth.net',
+  'appleid.apple.com',
+  'accounts.firefox.com'
+];
+
 // URLがサービスのメインページかどうかをチェック
 function isServiceMainUrl(url) {
   try {
@@ -19,52 +31,125 @@ function isServiceMainUrl(url) {
   }
 }
 
+// ホスト名からベースドメインを取得（例: "app.slack.com" → "slack.com"）
+function getBaseDomain(hostname) {
+  const parts = hostname.split('.');
+  if (parts.length <= 2) return hostname;
+  return parts.slice(-2).join('.');
+}
+
+// 2つのURLが同じベースドメインかチェック
+function isSameBaseDomain(url1, url2) {
+  try {
+    const host1 = new URL(url1).hostname;
+    const host2 = new URL(url2).hostname;
+    return getBaseDomain(host1) === getBaseDomain(host2);
+  } catch {
+    return false;
+  }
+}
+
+// URLが認証関連かどうかをチェック
+function isAuthUrl(url) {
+  try {
+    const urlObj = new URL(url);
+    return authDomains.some(domain =>
+      urlObj.hostname === domain || urlObj.hostname.endsWith('.' + domain)
+    );
+  } catch {
+    return false;
+  }
+}
+
+// 認証ポップアップウィンドウを作成
+function createAuthWindow(url, contents) {
+  const mainWindow = getMainWindow();
+  const originalSession = contents.session;
+
+  const authWindow = new BrowserWindow({
+    width: 600,
+    height: 700,
+    parent: mainWindow,
+    modal: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      session: originalSession
+    }
+  });
+
+  authWindow.loadURL(url);
+
+  // 認証完了を検知（サービスのメインURLにリダイレクトされたら）
+  authWindow.webContents.on('will-redirect', (e, redirectUrl) => {
+    if (isServiceMainUrl(redirectUrl)) {
+      authWindow.close();
+      const mainWin = getMainWindow();
+      if (mainWin) {
+        mainWin.webContents.send('auth-completed', redirectUrl);
+      }
+    }
+  });
+
+  authWindow.webContents.on('did-navigate', (e, navigatedUrl) => {
+    if (isServiceMainUrl(navigatedUrl)) {
+      authWindow.close();
+      const mainWin = getMainWindow();
+      if (mainWin) {
+        mainWin.webContents.send('auth-completed', navigatedUrl);
+      }
+    }
+  });
+}
+
 // 認証ポップアップウィンドウのハンドラーを設定
 function setupWindowOpenHandler(contents) {
-  const mainWindow = getMainWindow();
+  contents.setWindowOpenHandler(({ url }) => {
+    // 無効なURLやjavascript:は無視
+    if (!url || url === 'about:blank' || url.startsWith('javascript:')) {
+      return { action: 'deny' };
+    }
 
-  contents.setWindowOpenHandler(({ url, frameName }) => {
-    // 元のwebviewのセッションを取得して共有
-    const originalSession = contents.session;
+    const currentUrl = contents.getURL();
 
-    // 認証ポップアップ用のウィンドウを作成
-    const authWindow = new BrowserWindow({
-      width: 600,
-      height: 700,
-      parent: mainWindow,
-      modal: false,
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true,
-        session: originalSession // 元のwebviewと同じセッションを使用
-      }
-    });
+    // 認証URLの場合は認証ポップアップで開く
+    if (isAuthUrl(url)) {
+      createAuthWindow(url, contents);
+      return { action: 'deny' };
+    }
 
-    authWindow.loadURL(url);
+    // 同じサービスのドメインの場合は認証ポップアップで開く（サービス内ポップアップ）
+    if (isSameBaseDomain(url, currentUrl)) {
+      createAuthWindow(url, contents);
+      return { action: 'deny' };
+    }
 
-    // 認証完了を検知（サービスのメインURLにリダイレクトされたら）
-    authWindow.webContents.on('will-redirect', (e, redirectUrl) => {
-      if (isServiceMainUrl(redirectUrl)) {
-        // 認証完了：ポップアップを閉じて元のwebviewをそのURLにナビゲート
-        authWindow.close();
-        const mainWin = getMainWindow();
-        if (mainWin) {
-          mainWin.webContents.send('auth-completed', redirectUrl);
-        }
-      }
-    });
-
-    authWindow.webContents.on('did-navigate', (e, navigatedUrl) => {
-      if (isServiceMainUrl(navigatedUrl)) {
-        authWindow.close();
-        const mainWin = getMainWindow();
-        if (mainWin) {
-          mainWin.webContents.send('auth-completed', navigatedUrl);
-        }
-      }
-    });
-
+    // その他の外部リンクはデフォルトブラウザで開く
+    shell.openExternal(url);
     return { action: 'deny' };
+  });
+}
+
+// ナビゲーションハンドラーを設定（外部リンクをデフォルトブラウザで開く）
+function setupNavigationHandler(contents) {
+  contents.on('will-navigate', (event, url) => {
+    // webviewコンテンツのみ処理
+    if (contents.getType() !== 'webview') return;
+
+    const currentUrl = contents.getURL();
+
+    // 同じベースドメインへのナビゲーションは許可
+    if (isSameBaseDomain(url, currentUrl)) return;
+
+    // 認証ドメインへのナビゲーションは許可
+    if (isAuthUrl(url)) return;
+
+    // サービスのメインURLへのナビゲーションは許可（認証完了後のリダイレクトなど）
+    if (isServiceMainUrl(url)) return;
+
+    // その他の外部URLはデフォルトブラウザで開く
+    event.preventDefault();
+    shell.openExternal(url);
   });
 }
 
@@ -142,7 +227,7 @@ function setupContextMenu(contents) {
     if (params.linkURL) {
       menuItems.push(
         {
-          label: 'リンクを新しいタブで開く',
+          label: 'リンクをブラウザで開く',
           click: () => shell.openExternal(params.linkURL)
         },
         {
@@ -193,6 +278,7 @@ function setupContextMenu(contents) {
 // web-contents-createdイベントで呼び出すセキュリティ設定
 function setupWebContentsSecurity(contents) {
   setupWindowOpenHandler(contents);
+  setupNavigationHandler(contents);
   setupContextMenu(contents);
 }
 
