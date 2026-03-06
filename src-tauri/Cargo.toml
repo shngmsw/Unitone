@@ -1,12 +1,12 @@
 [package]
-name = "unitone"
+name = "hitotone"
 version = "1.0.0"
 description = "複数のチャットツールを1つにまとめるデスクトップアプリ"
 authors = ["shngmsw"]
 edition = "2021"
 
 [lib]
-name = "unitone_lib"
+name = "hitotone_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

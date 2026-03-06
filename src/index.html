@@ -3,20 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Unitone</title>
+  <title>Hitotone</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <!-- アプリヘッダー（ドラッグでウィンドウ移動可能） -->
   <header id="app-header" data-tauri-drag-region>
-    <span class="app-title">Unitone</span>
+    <span class="app-title">Hitotone</span>
   </header>
 
   <div id="app">
     <!-- L1: サービスドック -->
     <aside id="service-dock">
       <div id="app-logo">
-        <img src="../assets/icons/icon.png" alt="Unitone">
+        <img src="../assets/icons/icon.png" alt="Hitotone">
       </div>
       <div id="service-list"></div>
       <div id="dock-actions">
@@ -86,7 +86,25 @@
   <div id="settings-modal" class="modal hidden">
     <div class="modal-content">
       <h2>設定</h2>
-      <div id="service-settings-list"></div>
+      
+      <div class="settings-section">
+        <h3>外観</h3>
+        <div class="form-group">
+          <label for="theme-selector">テーマカラー（グラデーション）</label>
+          <select id="theme-selector" class="settings-select">
+            <option value="default">Hitotone Dark (Default)</option>
+            <option value="midnight">Midnight Rose</option>
+            <option value="oceanic">Oceanic Blue</option>
+            <option value="aurora">Aurora Glow</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>サービス管理</h3>
+        <div id="service-settings-list"></div>
+      </div>
+
       <div class="form-actions">
         <button id="close-settings-btn">設定を閉じる</button>
       </div>

@@ -1,4 +1,4 @@
-// Unitone Renderer Process - Main Entry Point (Tauri v2)
+// Hitotone Renderer Process - Main Entry Point (Tauri v2)
 
 import { invoke } from '@tauri-apps/api/core';
 import { LoadingManager } from './LoadingManager.js';
@@ -9,7 +9,7 @@ import { SettingsManager } from './SettingsManager.js';
 import { EventManager } from './EventManager.js';
 import { UpdateManager } from './UpdateManager.js';
 
-class Unitone {
+class Hitotone {
   constructor() {
     // State
     this.services = [];
@@ -31,69 +31,69 @@ class Unitone {
 
   async init() {
     try {
-      console.log('[Unitone] init() start');
+      console.log('[Hitotone] init() start');
 
       // プラットフォーム判定してbodyにクラスを追加
       const platform = await invoke('get_platform');
       document.body.classList.add(`platform-${platform}`);
-      console.log('[Unitone] platform:', platform);
+      console.log('[Hitotone] platform:', platform);
 
       // 設定を読み込み
       this.services = await invoke('get_services');
-      console.log('[Unitone] services:', this.services);
+      console.log('[Hitotone] services:', this.services);
       this.activeServiceId = await invoke('get_active_service');
-      console.log('[Unitone] activeServiceId:', this.activeServiceId);
+      console.log('[Hitotone] activeServiceId:', this.activeServiceId);
       this.aiServices = await invoke('get_ai_services');
-      console.log('[Unitone] aiServices:', this.aiServices);
+      console.log('[Hitotone] aiServices:', this.aiServices);
       this.activeAiService = await invoke('get_active_ai_service');
-      console.log('[Unitone] activeAiService:', this.activeAiService);
+      console.log('[Hitotone] activeAiService:', this.activeAiService);
       const showAiCompanion = await invoke('get_show_ai_companion');
       const aiWidth = await invoke('get_ai_width');
-      console.log('[Unitone] showAiCompanion:', showAiCompanion, 'aiWidth:', aiWidth);
+      console.log('[Hitotone] showAiCompanion:', showAiCompanion, 'aiWidth:', aiWidth);
 
       // サービスドックを構築
       this.serviceDockManager.render();
-      console.log('[Unitone] dock rendered');
+      console.log('[Hitotone] dock rendered');
 
       // イベントリスナーを設定（先に登録してボタンを確実に動くようにする）
       this.eventManager.setup();
-      console.log('[Unitone] event listeners setup done');
+      console.log('[Hitotone] event listeners setup done');
 
       // リサイズハンドルを設定
       this.aiCompanionManager.setupResizeHandle();
 
       // WebViewをRust側で作成
       try {
-        console.log('[Unitone] creating webviews...');
+        console.log('[Hitotone] creating webviews...');
         await this.webViewManager.createWebViews();
-        console.log('[Unitone] webviews created');
+        console.log('[Hitotone] webviews created');
       } catch (err) {
-        console.warn('[Unitone] webview creation error (non-fatal):', err);
+        console.warn('[Hitotone] webview creation error (non-fatal):', err);
       }
 
       // AIコンパニオンを設定
       try {
-        console.log('[Unitone] setting up AI companion...');
+        console.log('[Hitotone] setting up AI companion...');
         await this.aiCompanionManager.setup(showAiCompanion, aiWidth);
-        console.log('[Unitone] AI companion setup done');
+        console.log('[Hitotone] AI companion setup done');
       } catch (err) {
-        console.warn('[Unitone] AI companion setup error (non-fatal):', err);
+        console.warn('[Hitotone] AI companion setup error (non-fatal):', err);
       }
 
       // 初期サービスをアクティブに
       if (this.activeServiceId) {
-        console.log('[Unitone] switching to active service:', this.activeServiceId);
+        console.log('[Hitotone] switching to active service:', this.activeServiceId);
         await this.webViewManager.switchService(this.activeServiceId);
       } else if (this.services.length > 0) {
-        console.log('[Unitone] switching to first service:', this.services[0].id);
+        console.log('[Hitotone] switching to first service:', this.services[0].id);
         await this.webViewManager.switchService(this.services[0].id);
       }
 
       // ローディング非表示
       this.loadingManager.hide();
-      console.log('[Unitone] init() complete - loading hidden');
+      console.log('[Hitotone] init() complete - loading hidden');
     } catch (error) {
-      console.error('Unitone initialization failed:', error);
+      console.error('Hitotone initialization failed:', error);
       console.error('Error stack:', error.stack || error);
     }
   }
@@ -101,5 +101,5 @@ class Unitone {
 
 // アプリ起動
 document.addEventListener('DOMContentLoaded', () => {
-  new Unitone();
+  new Hitotone();
 });

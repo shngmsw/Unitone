@@ -4,8 +4,8 @@
 import { invoke } from '@tauri-apps/api/core';
 
 export class WebViewManager {
-  constructor(unitone) {
-    this.unitone = unitone;
+  constructor(hitotone) {
+    this.hitotone = hitotone;
     this.initialLoadDone = new Set();
     this.faviconExtracted = new Set();
   }
@@ -16,7 +16,7 @@ export class WebViewManager {
   }
 
   async switchService(serviceId) {
-    const service = this.unitone.services.find(s => s.id === serviceId);
+    const service = this.hitotone.services.find(s => s.id === serviceId);
     if (!service) return;
 
     // 前のアクティブを非アクティブに
@@ -28,7 +28,7 @@ export class WebViewManager {
     await invoke('switch_service_webview', { serviceId });
 
     // アクティブなサービスを更新
-    this.unitone.activeServiceId = serviceId;
+    this.hitotone.activeServiceId = serviceId;
     const activeItem = document.querySelector(`.service-item[data-service-id="${serviceId}"]`);
     if (activeItem) {
       activeItem.classList.add('active');
@@ -45,14 +45,14 @@ export class WebViewManager {
 
   async navigateActiveWebview(url) {
     // Slackの場合、認証後のURLを保存する
-    if (this.unitone.activeServiceId === 'slack' && url && url.includes('app.slack.com/client/')) {
+    if (this.hitotone.activeServiceId === 'slack' && url && url.includes('app.slack.com/client/')) {
       const services = await invoke('update_service', {
         service: {
-          ...this.unitone.services.find(s => s.id === 'slack'),
+          ...this.hitotone.services.find(s => s.id === 'slack'),
           url: url
         }
       });
-      this.unitone.services = services;
+      this.hitotone.services = services;
     }
   }
 

@@ -11,51 +11,92 @@
   --ai-min-width: 300px;
   --ai-max-width: 800px;
 
-  /* スペーシング（8pxグリッド） - SHIG #85 整然とレイアウト */
+  /* スペーシング */
   --space-xs: 4px;
   --space-sm: 8px;
   --space-md: 16px;
   --space-lg: 24px;
   --space-xl: 32px;
 
-  /* カラー - SHIG #84 色を使いすぎない */
+  /* カラーパレット (Default: Hitotone Dark) */
   --bg-primary: #1a1a2e;
   --bg-secondary: #16213e;
   --bg-tertiary: #0f3460;
   --bg-elevated: #1e2a4a;
+  --bg-gradient: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  --dock-gradient: linear-gradient(180deg, #16213e 0%, #1a1a2e 100%);
+
   --text-primary: #eee;
   --text-secondary: #aaa;
   --text-disabled: #666;
   --accent: #e94560;
   --accent-hover: #ff6b6b;
   --accent-subtle: rgba(233, 69, 96, 0.15);
-  --border-color: #333;
+  --border-color: rgba(255, 255, 255, 0.1);
   --border-focus: #e94560;
 
-  /* シャドウ - SHIG #4 シグニファイア（押せそうに見せる） */
+  /* シャドウ */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
 
-  /* トランジション - SHIG #63 アニメーション0.1-0.5秒 */
+  /* トランジション */
   --transition-fast: 0.1s ease;
   --transition-normal: 0.2s ease;
-  --transition-slow: 0.3s ease;
+  --transition-slow: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 
   /* ボーダーラジウス */
   --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
 
-  /* ボタンサイズ - SHIG #78 タッチ要素7mm以上（44px） */
+  /* ボタンサイズ */
   --btn-size: 44px;
   --btn-size-lg: 48px;
 }
 
-html, body {
+/* Midnight Rose Theme */
+body[data-theme="midnight"] {
+  --bg-primary: #120422;
+  --bg-secondary: #1a0832;
+  --bg-tertiary: #2a0e4a;
+  --bg-elevated: #3a1a63;
+  --bg-gradient: linear-gradient(135deg, #120422 0%, #2a0e4a 100%);
+  --dock-gradient: linear-gradient(180deg, #1a0832 0%, #120422 100%);
+  --accent: #ff007f;
+  --accent-hover: #ff4da6;
+}
+
+/* Oceanic Blue Theme */
+body[data-theme="oceanic"] {
+  --bg-primary: #041222;
+  --bg-secondary: #081a32;
+  --bg-tertiary: #0e354a;
+  --bg-elevated: #1a4a63;
+  --bg-gradient: linear-gradient(135deg, #041222 0%, #0e354a 100%);
+  --dock-gradient: linear-gradient(180deg, #081a32 0%, #041222 100%);
+  --accent: #00d2ff;
+  --accent-hover: #4ddbff;
+}
+
+/* Aurora Theme */
+body[data-theme="aurora"] {
+  --bg-primary: #0a1f1a;
+  --bg-secondary: #0f2d26;
+  --bg-tertiary: #1a4a3e;
+  --bg-elevated: #266b59;
+  --bg-gradient: linear-gradient(135deg, #0a1f1a 0%, #2a1a4a 100%);
+  --dock-gradient: linear-gradient(180deg, #0f2d26 0%, #0a1f1a 100%);
+  --accent: #39ff14;
+  --accent-hover: #80ff66;
+}
+
+html,
+body {
   height: 100%;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: var(--bg-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg-gradient);
+  background-attachment: fixed;
   color: var(--text-primary);
   overflow: hidden;
 }
@@ -100,12 +141,12 @@ body.platform-win32 #app-header {
 /* L1: サービスドック - SHIG #10 視覚ゲシュタルト（近接でグループ化） */
 #service-dock {
   width: var(--dock-width);
-  background: var(--bg-secondary);
+  background: var(--dock-gradient);
   display: flex;
   flex-direction: column;
   padding: var(--space-sm);
   border-right: 1px solid var(--border-color);
-  /* drag region handled by data-tauri-drag-region attribute */
+  z-index: 20;
 }
 
 /* App logo at top of sidebar */
@@ -168,8 +209,8 @@ body.platform-darwin #service-dock {
   justify-content: center;
   cursor: pointer;
   transition: background-color var(--transition-normal),
-              transform var(--transition-fast),
-              box-shadow var(--transition-normal);
+    transform var(--transition-fast),
+    box-shadow var(--transition-normal);
   position: relative;
   font-size: 22px;
   border: none;
@@ -297,8 +338,8 @@ body.platform-darwin #service-dock {
   font-size: 16px;
   cursor: pointer;
   transition: background-color var(--transition-normal),
-              color var(--transition-normal),
-              transform var(--transition-fast);
+    color var(--transition-normal),
+    transform var(--transition-fast);
   box-shadow: var(--shadow-sm);
 }
 
@@ -358,19 +399,22 @@ body.platform-darwin #service-dock {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* L3: AIコンパニオン - SHIG #64 トランジションは両方向につける */
 #ai-companion {
   width: var(--ai-width);
-  background: var(--bg-secondary);
+  background: var(--dock-gradient);
   border-left: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   transition: width var(--transition-slow),
-              opacity var(--transition-slow);
+    opacity var(--transition-slow);
   position: relative;
+  z-index: 20;
 }
 
 #ai-companion.hidden {
@@ -423,7 +467,7 @@ body.resizing-active iframe {
 }
 
 /* SHIG #60 エスケープハッチ - 閉じるボタンは常にアクセス可能 */
-#ai-header > button,
+#ai-header>button,
 #close-ai-btn {
   /* no-drag: interactive elements */
   background: none;
@@ -438,10 +482,10 @@ body.resizing-active iframe {
   align-items: center;
   justify-content: center;
   transition: background-color var(--transition-fast),
-              color var(--transition-fast);
+    color var(--transition-fast);
 }
 
-#ai-header > button:hover,
+#ai-header>button:hover,
 #close-ai-btn:hover {
   background: rgba(255, 255, 255, 0.1);
   color: var(--text-primary);
@@ -577,8 +621,13 @@ body.resizing-active iframe {
 }
 
 @keyframes modalFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 .modal.hidden {
@@ -603,6 +652,7 @@ body.resizing-active iframe {
     opacity: 0;
     transform: translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -612,8 +662,38 @@ body.resizing-active iframe {
 .modal-content h2 {
   margin-bottom: var(--space-lg);
   color: var(--text-primary);
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 20px;
+  font-weight: 700;
+  border-bottom: 2px solid var(--accent);
+  padding-bottom: var(--space-sm);
+}
+
+.settings-section {
+  margin-bottom: var(--space-xl);
+}
+
+.settings-section h3 {
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: var(--space-md);
+}
+
+.settings-select {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.settings-select:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 /* SHIG #40 入力フォームにはストーリー性を持たせる */
@@ -642,7 +722,7 @@ body.resizing-active iframe {
   color: var(--text-primary);
   font-size: 14px;
   transition: border-color var(--transition-fast),
-              box-shadow var(--transition-fast);
+    box-shadow var(--transition-fast);
   min-height: var(--btn-size);
 }
 
@@ -680,7 +760,7 @@ body.resizing-active iframe {
   font-size: 14px;
   font-weight: 500;
   transition: background-color var(--transition-fast),
-              transform var(--transition-fast);
+    transform var(--transition-fast);
 }
 
 .form-actions button[type="button"],
@@ -777,7 +857,7 @@ body.resizing-active iframe {
   align-items: center;
   justify-content: center;
   transition: background-color var(--transition-fast),
-              color var(--transition-fast);
+    color var(--transition-fast);
 }
 
 .service-setting-item .edit-btn:hover {
@@ -821,6 +901,7 @@ body.resizing-active iframe {
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -893,4 +974,3 @@ body.resizing-active iframe {
 #update-actions .update-btn-primary:hover {
   filter: brightness(1.1);
 }
-

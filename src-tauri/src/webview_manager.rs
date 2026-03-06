@@ -96,7 +96,7 @@ pub fn create_service_webview_window(
         label,
         tauri::WebviewUrl::External(parsed_url),
     )
-    .title(&format!("Unitone - {}", label))
+    .title(&format!("Hitotone - {}", label))
     .inner_size(layout.service_width, layout.service_height)
     .decorations(false)
     .skip_taskbar(true)

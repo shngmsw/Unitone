@@ -3,8 +3,8 @@
 import { invoke } from '@tauri-apps/api/core';
 
 export class ServiceDockManager {
-  constructor(unitone) {
-    this.unitone = unitone;
+  constructor(hitotone) {
+    this.hitotone = hitotone;
     this.badges = new Map();
     this.draggedElement = null;
     this.dropPosition = null;
@@ -16,7 +16,7 @@ export class ServiceDockManager {
 
     serviceList.innerHTML = '';
 
-    this.unitone.services.filter(s => s.enabled).forEach(service => {
+    this.hitotone.services.filter(s => s.enabled).forEach(service => {
       const item = document.createElement('div');
       item.className = 'service-item';
       item.dataset.serviceId = service.id;
@@ -39,7 +39,7 @@ export class ServiceDockManager {
       badge.textContent = '0';
       item.appendChild(badge);
 
-      item.addEventListener('click', () => this.unitone.webViewManager.switchService(service.id));
+      item.addEventListener('click', () => this.hitotone.webViewManager.switchService(service.id));
 
       // Drag and drop event listeners
       item.addEventListener('dragstart', (e) => this.handleDragStart(e));
@@ -71,7 +71,7 @@ export class ServiceDockManager {
     const item = document.querySelector(`.service-item[data-service-id="${serviceId}"]`);
     if (!item) return;
 
-    const service = this.unitone.services.find(s => s.id === serviceId);
+    const service = this.hitotone.services.find(s => s.id === serviceId);
 
     // Remove old icon (emoji or old favicon)
     const oldIcon = item.querySelector('.service-favicon') || item.firstChild;

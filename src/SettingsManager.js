@@ -3,8 +3,34 @@
 import { invoke } from '@tauri-apps/api/core';
 
 export class SettingsManager {
-  constructor(unitone) {
-    this.unitone = unitone;
+  constructor(hitotone) {
+    this.hitotone = hitotone;
+    this.initTheme();
+    this.setupThemeListener();
+  }
+
+  // テーマの初期化
+  initTheme() {
+    const savedTheme = localStorage.getItem('hitotone-theme') || 'default';
+    document.body.dataset.theme = savedTheme;
+
+    // セレクターの初期値を設定
+    const selector = document.getElementById('theme-selector');
+    if (selector) {
+      selector.value = savedTheme;
+    }
+  }
+
+  // テーマ変更のリスナー設定
+  setupThemeListener() {
+    const selector = document.getElementById('theme-selector');
+    if (selector) {
+      selector.addEventListener('change', (e) => {
+        const theme = e.target.value;
+        document.body.dataset.theme = theme;
+        localStorage.setItem('hitotone-theme', theme);
+      });
+    }
   }
 
   // XSS対策: HTMLエスケープ
@@ -15,12 +41,19 @@ export class SettingsManager {
   }
 
   open() {
+    // リストの描画前にテーマセレクターの状態を同期
+    const savedTheme = localStorage.getItem('hitotone-theme') || 'default';
+    const selector = document.getElementById('theme-selector');
+    if (selector) {
+      selector.value = savedTheme;
+    }
+
     const list = document.getElementById('service-settings-list');
     if (!list) return;
 
     list.innerHTML = '';
 
-    this.unitone.services.forEach(service => {
+    this.hitotone.services.forEach(service => {
       const item = document.createElement('div');
       item.className = 'service-setting-item';
       item.innerHTML = `
@@ -52,14 +85,14 @@ export class SettingsManager {
       btn.addEventListener('click', async () => {
         const serviceId = btn.dataset.serviceId;
         if (confirm('このサービスを削除しますか？')) {
-          this.unitone.services = await invoke('remove_service', { serviceId });
-          this.unitone.serviceDockManager.render();
+          this.hitotone.services = await invoke('remove_service', { serviceId });
+          this.hitotone.serviceDockManager.render();
 
           // WebViewの削除もRust側で処理
           await invoke('remove_service_webview', { serviceId });
 
-          if (this.unitone.activeServiceId === serviceId && this.unitone.services.length > 0) {
-            await this.unitone.webViewManager.switchService(this.unitone.services[0].id);
+          if (this.hitotone.activeServiceId === serviceId && this.hitotone.services.length > 0) {
+            await this.hitotone.webViewManager.switchService(this.hitotone.services[0].id);
           }
 
           this.open(); // リストを更新

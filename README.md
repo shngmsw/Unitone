@@ -1,22 +1,22 @@
 <p align="center">
-  <img src="assets/icons/128x128.png" alt="Unitone Logo" width="128" height="128">
+  <img src="assets/icons/128x128.png" alt="Hitotone Logo" width="128" height="128">
 </p>
 
-<h1 align="center">Unitone</h1>
+<h1 align="center">Hitotone</h1>
 
 <p align="center">
-  <strong>All your chat apps in one place</strong>
+  <strong>一音 (Hito-Tone) - All your communication in one harmony</strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/shngmsw/Unitone/releases/latest">
-    <img src="https://img.shields.io/github/v/release/shngmsw/Unitone?style=flat-square" alt="GitHub Release">
+  <a href="https://github.com/shngmsw/Hitotone/releases/latest">
+    <img src="https://img.shields.io/github/v/release/shngmsw/Hitotone?style=flat-square" alt="GitHub Release">
   </a>
-  <a href="https://github.com/shngmsw/Unitone/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/shngmsw/Unitone?style=flat-square" alt="License">
+  <a href="https://github.com/shngmsw/Hitotone/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/shngmsw/Hitotone?style=flat-square" alt="License">
   </a>
-  <a href="https://github.com/shngmsw/Unitone/releases">
-    <img src="https://img.shields.io/github/downloads/shngmsw/Unitone/total?style=flat-square" alt="Downloads">
+  <a href="https://github.com/shngmsw/Hitotone/releases">
+    <img src="https://img.shields.io/github/downloads/shngmsw/Hitotone/total?style=flat-square" alt="Downloads">
   </a>
 </p>
 
@@ -37,12 +37,12 @@
 
 ## About
 
-Unitone is a desktop application that lets you manage multiple chat services like Slack, Google Chat, Microsoft Teams, and Chatwork in a single window. No more switching between apps or browser tabs - stay focused and organized.
+Hitotone (一音 - "One Tone") is a desktop application that harmonizes multiple chat services like Slack, Google Chat, Microsoft Teams, and Chatwork into a single, unified window. It stays true to its name by bringing all your notifications and communication into one consistent experience.
 
 <!--
 Screenshot placeholder - Add your screenshot here
 <p align="center">
-  <img src="docs/screenshot.png" alt="Unitone Screenshot" width="800">
+  <img src="docs/screenshot.png" alt="Hitotone Screenshot" width="800">
 </p>
 -->
 
@@ -72,18 +72,18 @@ Screenshot placeholder - Add your screenshot here
 
 ### Download
 
-Download the latest version for your platform from [GitHub Releases](https://github.com/shngmsw/Unitone/releases/latest):
+Download the latest version for your platform from [GitHub Releases](https://github.com/shngmsw/Hitotone/releases/latest):
 
 | Platform | Download |
 |----------|----------|
-| **Windows** | `Unitone-Setup-x.x.x.exe` (installer) or `Unitone-x.x.x-portable.exe` |
-| **macOS (Intel)** | `Unitone-x.x.x-x64.dmg` |
-| **macOS (Apple Silicon)** | `Unitone-x.x.x-arm64.dmg` |
-| **Linux** | `Unitone-x.x.x.AppImage`, `.deb`, or `.rpm` |
+| **Windows** | `Hitotone-Setup-x.x.x.exe` (installer) or `Hitotone-x.x.x-portable.exe` |
+| **macOS (Intel)** | `Hitotone-x.x.x-x64.dmg` |
+| **macOS (Apple Silicon)** | `Hitotone-x.x.x-arm64.dmg` |
+| **Linux** | `Hitotone-x.x.x.AppImage`, `.deb`, or `.rpm` |
 
 ### Important Note on Code Signing
 
-> **Note**: Unitone is distributed without code signing certificates. This means:
+> **Note**: Hitotone is distributed without code signing certificates. This means:
 >
 > - **Windows**: You may see a "Windows protected your PC" warning from SmartScreen. Click "More info" → "Run anyway" to proceed.
 > - **macOS**: You may see a "cannot be opened because the developer cannot be verified" warning. Right-click the app → "Open" → "Open" to allow it, or go to System Preferences → Security & Privacy → "Open Anyway".
@@ -95,7 +95,7 @@ Download the latest version for your platform from [GitHub Releases](https://git
 
 ### Basic Operations
 
-1. **Launch Unitone** - Open the app from your Applications folder or Start Menu
+1. **Launch Hitotone** - Open the app from your Applications folder or Start Menu
 2. **Add a Service** - Click the `+` button in the sidebar to add a new chat service
 3. **Switch Services** - Click on service icons in the sidebar to switch between them
 4. **Reorder Services** - Drag and drop service icons to reorder them
@@ -121,8 +121,8 @@ Download the latest version for your platform from [GitHub Releases](https://git
 
 ```bash
 # Clone the repository
-git clone https://github.com/shngmsw/Unitone.git
-cd Unitone
+git clone https://github.com/shngmsw/Hitotone.git
+cd Hitotone
 
 # Install dependencies
 npm install
@@ -149,7 +149,7 @@ npm run build:all
 ### Project Structure
 
 ```
-Unitone/
+Hitotone/
 ├── assets/           # Icons and resources
 │   ├── icons/        # App icons (various sizes)
 │   └── mac/          # macOS entitlements

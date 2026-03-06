@@ -3,8 +3,8 @@
 import { invoke } from '@tauri-apps/api/core';
 
 export class AiCompanionManager {
-  constructor(unitone) {
-    this.unitone = unitone;
+  constructor(hitotone) {
+    this.hitotone = hitotone;
   }
 
   // XSS対策: HTMLエスケープ
@@ -33,9 +33,9 @@ export class AiCompanionManager {
     if (show) {
       aiCompanion.classList.remove('hidden');
       // Rust側でAI WebViewを作成
-      if (this.unitone.activeAiService) {
+      if (this.hitotone.activeAiService) {
         await invoke('setup_ai_webview', {
-          url: this.unitone.activeAiService.url,
+          url: this.hitotone.activeAiService.url,
           width: width || 400
         });
       }
@@ -53,11 +53,11 @@ export class AiCompanionManager {
     // Rust側でトグル＆レイアウト更新
     await invoke('toggle_ai_webview');
 
-    if (!isHidden && this.unitone.activeAiService) {
+    if (!isHidden && this.hitotone.activeAiService) {
       // AI WebViewがまだ作成されていない場合は作成
       try {
         await invoke('create_ai_webview', {
-          url: this.unitone.activeAiService.url
+          url: this.hitotone.activeAiService.url
         });
       } catch (_) {
         // Already created
@@ -70,8 +70,8 @@ export class AiCompanionManager {
 
   updateSelectorDisplay() {
     const nameElement = document.getElementById('ai-current-name');
-    if (nameElement && this.unitone.activeAiService) {
-      nameElement.textContent = this.unitone.activeAiService.name;
+    if (nameElement && this.hitotone.activeAiService) {
+      nameElement.textContent = this.hitotone.activeAiService.name;
     }
   }
 
@@ -79,8 +79,8 @@ export class AiCompanionManager {
     const list = document.getElementById('ai-dropdown-list');
     if (!list) return;
 
-    list.innerHTML = this.unitone.aiServices.map(service => {
-      const isActive = this.unitone.activeAiService && service.id === this.unitone.activeAiService.id;
+    list.innerHTML = this.hitotone.aiServices.map(service => {
+      const isActive = this.hitotone.activeAiService && service.id === this.hitotone.activeAiService.id;
       const escapedId = this.escapeHtml(service.id);
       const escapedName = this.escapeHtml(service.name);
       const deleteBtn = service.isDefault ? '' : `<button class="delete-ai-btn" data-id="${escapedId}" title="削除">×</button>`;
@@ -110,19 +110,19 @@ export class AiCompanionManager {
   }
 
   async switchService(serviceId) {
-    const service = this.unitone.aiServices.find(s => s.id === serviceId);
+    const service = this.hitotone.aiServices.find(s => s.id === serviceId);
     if (!service) return;
 
     // Rust側でAIサービスを切り替え（WebViewのナビゲーションも含む）
-    this.unitone.activeAiService = await invoke('switch_ai_service', { serviceId });
+    this.hitotone.activeAiService = await invoke('switch_ai_service', { serviceId });
     this.updateSelectorDisplay();
     this.renderDropdown();
     this.toggleDropdown(false);
   }
 
   async removeService(serviceId) {
-    this.unitone.aiServices = await invoke('remove_ai_service', { serviceId });
-    this.unitone.activeAiService = await invoke('get_active_ai_service');
+    this.hitotone.aiServices = await invoke('remove_ai_service', { serviceId });
+    this.hitotone.activeAiService = await invoke('get_active_ai_service');
     this.renderDropdown();
     this.updateSelectorDisplay();
   }

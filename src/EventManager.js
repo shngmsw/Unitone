@@ -4,8 +4,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
 export class EventManager {
-  constructor(unitone) {
-    this.unitone = unitone;
+  constructor(hitotone) {
+    this.hitotone = hitotone;
   }
 
   setup() {
@@ -20,14 +20,14 @@ export class EventManager {
     const aiSelectorBtn = document.getElementById('ai-selector-btn');
     if (aiSelectorBtn) {
       aiSelectorBtn.addEventListener('click', () => {
-        this.unitone.aiCompanionManager.toggleDropdown();
+        this.hitotone.aiCompanionManager.toggleDropdown();
       });
     }
 
     const addAiBtn = document.getElementById('add-ai-btn');
     if (addAiBtn) {
       addAiBtn.addEventListener('click', () => {
-        this.unitone.aiCompanionManager.toggleDropdown(false);
+        this.hitotone.aiCompanionManager.toggleDropdown(false);
         const modal = document.getElementById('add-ai-modal');
         if (modal) modal.classList.remove('hidden');
       });
@@ -52,10 +52,10 @@ export class EventManager {
         const name = nameInput ? nameInput.value : '';
         const url = urlInput ? urlInput.value : '';
 
-        this.unitone.aiServices = await invoke('add_ai_service', {
+        this.hitotone.aiServices = await invoke('add_ai_service', {
           service: { id: '', name, url, isDefault: false }
         });
-        this.unitone.aiCompanionManager.renderDropdown();
+        this.hitotone.aiCompanionManager.renderDropdown();
 
         const modal = document.getElementById('add-ai-modal');
         if (modal) modal.classList.add('hidden');
@@ -68,7 +68,7 @@ export class EventManager {
       const selector = document.getElementById('ai-selector');
       const dropdown = document.getElementById('ai-dropdown');
       if (selector && dropdown && !selector.contains(e.target) && !dropdown.classList.contains('hidden')) {
-        this.unitone.aiCompanionManager.toggleDropdown(false);
+        this.hitotone.aiCompanionManager.toggleDropdown(false);
       }
     });
   }
@@ -103,13 +103,13 @@ export class EventManager {
         const url = urlInput ? urlInput.value : '';
         const icon = iconInput ? (iconInput.value || '🔗') : '🔗';
 
-        this.unitone.services = await invoke('add_service', {
+        this.hitotone.services = await invoke('add_service', {
           service: { id: '', name, url, icon, enabled: true }
         });
-        this.unitone.serviceDockManager.render();
+        this.hitotone.serviceDockManager.render();
 
         // 新しいサービスのWebViewを作成
-        const newService = this.unitone.services[this.unitone.services.length - 1];
+        const newService = this.hitotone.services[this.hitotone.services.length - 1];
         if (newService) {
           await invoke('create_service_webview', {
             serviceId: newService.id,
@@ -145,52 +145,52 @@ export class EventManager {
         const url = urlInput ? urlInput.value : '';
         const icon = iconInput ? (iconInput.value || '🔗') : '🔗';
 
-        const service = this.unitone.services.find(s => s.id === id);
+        const service = this.hitotone.services.find(s => s.id === id);
         if (service) {
           const updatedService = { ...service, name, url, icon };
-          this.unitone.services = await invoke('update_service', { service: updatedService });
-          this.unitone.serviceDockManager.render();
+          this.hitotone.services = await invoke('update_service', { service: updatedService });
+          this.hitotone.serviceDockManager.render();
 
           // WebViewを再作成（URLが変わった可能性があるため）
           await invoke('remove_service_webview', { serviceId: id });
           await invoke('create_service_webview', { serviceId: id, url });
 
-          if (this.unitone.activeServiceId === id) {
-            await this.unitone.webViewManager.switchService(id);
+          if (this.hitotone.activeServiceId === id) {
+            await this.hitotone.webViewManager.switchService(id);
           }
         }
 
         const modal = document.getElementById('edit-service-modal');
         if (modal) modal.classList.add('hidden');
-        this.unitone.settingsManager.open();
+        this.hitotone.settingsManager.open();
       });
     }
 
     const toggleAiBtn = document.getElementById('toggle-ai-btn');
     if (toggleAiBtn) {
       toggleAiBtn.addEventListener('click', () => {
-        this.unitone.aiCompanionManager.toggle();
+        this.hitotone.aiCompanionManager.toggle();
       });
     }
 
     const closeAiBtn = document.getElementById('close-ai-btn');
     if (closeAiBtn) {
       closeAiBtn.addEventListener('click', () => {
-        this.unitone.aiCompanionManager.toggle();
+        this.hitotone.aiCompanionManager.toggle();
       });
     }
 
     const settingsBtn = document.getElementById('settings-btn');
     if (settingsBtn) {
       settingsBtn.addEventListener('click', () => {
-        this.unitone.settingsManager.open();
+        this.hitotone.settingsManager.open();
       });
     }
 
     const closeSettingsBtn = document.getElementById('close-settings-btn');
     if (closeSettingsBtn) {
       closeSettingsBtn.addEventListener('click', () => {
-        this.unitone.settingsManager.close();
+        this.hitotone.settingsManager.close();
       });
     }
   }
@@ -210,9 +210,9 @@ export class EventManager {
       // Cmd/Ctrl + 数字でサービス切り替え
       if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9') {
         const index = parseInt(e.key) - 1;
-        const enabledServices = this.unitone.services.filter(s => s.enabled);
+        const enabledServices = this.hitotone.services.filter(s => s.enabled);
         if (index < enabledServices.length) {
-          this.unitone.webViewManager.switchService(enabledServices[index].id);
+          this.hitotone.webViewManager.switchService(enabledServices[index].id);
         }
       }
 
@@ -229,23 +229,23 @@ export class EventManager {
     // バッジ更新をリッスン
     listen('badge-updated', (event) => {
       const { serviceId, count } = event.payload;
-      this.unitone.serviceDockManager.updateBadge(serviceId, count);
+      this.hitotone.serviceDockManager.updateBadge(serviceId, count);
     });
 
     // AIに送るをリッスン
     listen('send-to-ai', (event) => {
-      this.unitone.aiCompanionManager.sendToAi(event.payload);
+      this.hitotone.aiCompanionManager.sendToAi(event.payload);
     });
 
     // 認証完了時
     listen('auth-completed', (event) => {
-      this.unitone.webViewManager.navigateActiveWebview(event.payload);
+      this.hitotone.webViewManager.navigateActiveWebview(event.payload);
     });
 
     // favicon更新をリッスン
     listen('favicon-updated', (event) => {
       const { serviceId, faviconUrl } = event.payload;
-      this.unitone.serviceDockManager.updateServiceIcon(serviceId, faviconUrl);
+      this.hitotone.serviceDockManager.updateServiceIcon(serviceId, faviconUrl);
     });
   }
 }
