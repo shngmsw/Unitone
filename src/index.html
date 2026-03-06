@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hitotone</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- アプリヘッダー（ドラッグでウィンドウ移動可能） -->
+  <header id="app-header" data-tauri-drag-region>
+    <span class="app-title">Hitotone</span>
+  </header>
+
+  <div id="app">
+    <!-- L1: サービスドック -->
+    <aside id="service-dock">
+      <div id="app-logo">
+        <img src="../assets/icons/icon.png" alt="Hitotone">
+      </div>
+      <div id="service-list"></div>
+      <div id="dock-actions">
+        <button id="add-service-btn" class="dock-btn" title="サービスを追加">+</button>
+        <button id="toggle-ai-btn" class="dock-btn" title="AIコンパニオンを切り替え">AI</button>
+        <button id="settings-btn" class="dock-btn" title="設定">⚙</button>
+      </div>
+    </aside>
+
+    <!-- L2: メインキャンバス (WebViews managed by Tauri backend) -->
+    <main id="main-canvas">
+      <div id="webview-container"></div>
+      <div id="loading-indicator">
+        <div class="spinner"></div>
+        <span>読み込み中...</span>
+      </div>
+    </main>
+
+    <!-- L3: AIコンパニオン (AI WebView managed by Tauri backend) -->
+    <aside id="ai-companion" class="hidden">
+      <div id="resize-handle" title="ドラッグして幅を変更" tabindex="0" role="separator" aria-orientation="vertical" aria-label="サイドバーの幅を変更"></div>
+      <div id="ai-header" data-tauri-drag-region>
+        <div id="ai-selector">
+          <button id="ai-selector-btn" title="AIを切り替え">
+            <span id="ai-current-name">Gemini</span>
+            <span class="dropdown-arrow">▼</span>
+          </button>
+          <div id="ai-dropdown" class="hidden">
+            <div id="ai-dropdown-list"></div>
+            <button id="add-ai-btn" class="dropdown-add-btn">+ AIを追加</button>
+          </div>
+        </div>
+        <button id="close-ai-btn" title="閉じる">×</button>
+      </div>
+      <!-- AI WebView content area managed by Tauri -->
+      <div id="ai-webview-container" style="flex: 1;"></div>
+    </aside>
+  </div>
+
+  <!-- サービス追加モーダル -->
+  <div id="add-service-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2>サービスを追加</h2>
+      <form id="add-service-form">
+        <div class="form-group">
+          <label for="service-name">名前</label>
+          <input type="text" id="service-name" required placeholder="例: Discord">
+        </div>
+        <div class="form-group">
+          <label for="service-url">URL</label>
+          <input type="url" id="service-url" required placeholder="https://discord.com/app">
+        </div>
+        <div class="form-group">
+          <label for="service-icon">アイコン（絵文字）</label>
+          <input type="text" id="service-icon" placeholder="例: 🎮" maxlength="2">
+        </div>
+        <!-- SHIG #47 デフォルトボタンには具体的な動詞を用いる -->
+        <div class="form-actions">
+          <button type="button" id="cancel-add-btn">キャンセル</button>
+          <button type="submit">サービスを追加</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 設定モーダル -->
+  <div id="settings-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2>設定</h2>
+      
+      <div class="settings-section">
+        <h3>外観</h3>
+        <div class="form-group">
+          <label for="theme-selector">テーマカラー（グラデーション）</label>
+          <select id="theme-selector" class="settings-select">
+            <option value="default">Hitotone Dark (Default)</option>
+            <option value="midnight">Midnight Rose</option>
+            <option value="oceanic">Oceanic Blue</option>
+            <option value="aurora">Aurora Glow</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>サービス管理</h3>
+        <div id="service-settings-list"></div>
+      </div>
+
+      <div class="form-actions">
+        <button id="close-settings-btn">設定を閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- サービス編集モーダル -->
+  <div id="edit-service-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2>サービスを編集</h2>
+      <form id="edit-service-form">
+        <input type="hidden" id="edit-service-id">
+        <div class="form-group">
+          <label for="edit-service-name">名前</label>
+          <input type="text" id="edit-service-name" required>
+        </div>
+        <div class="form-group">
+          <label for="edit-service-url">URL</label>
+          <input type="url" id="edit-service-url" required placeholder="https://app.slack.com/client/XXXXX/XXXXX">
+        </div>
+        <div class="form-group">
+          <label for="edit-service-icon">アイコン（絵文字）</label>
+          <input type="text" id="edit-service-icon" maxlength="2">
+        </div>
+        <div class="form-actions">
+          <button type="button" id="cancel-edit-btn">キャンセル</button>
+          <button type="submit">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- AI追加モーダル -->
+  <div id="add-ai-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2>AIサービスを追加</h2>
+      <form id="add-ai-form">
+        <div class="form-group">
+          <label for="ai-name">名前</label>
+          <input type="text" id="ai-name" required placeholder="例: Perplexity">
+        </div>
+        <div class="form-group">
+          <label for="ai-url">URL</label>
+          <input type="url" id="ai-url" required placeholder="https://perplexity.ai">
+        </div>
+        <div class="form-actions">
+          <button type="button" id="cancel-add-ai-btn">キャンセル</button>
+          <button type="submit">追加</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 更新通知バナー -->
+  <div id="update-banner" class="hidden">
+    <div id="update-content">
+      <span id="update-message"></span>
+      <div id="update-progress" class="hidden">
+        <div id="update-progress-bar"></div>
+      </div>
+    </div>
+    <div id="update-actions"></div>
+  </div>
+
+  <script type="module" src="renderer.js"></script>
+</body>
+</html>
