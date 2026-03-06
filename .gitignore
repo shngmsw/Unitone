@@ -8,7 +8,11 @@ release/
 npm-debug.log*
 .env
 .env.local
-# Electron builder
+# Tauri build output
+src-tauri/target/
+src-dist/
+
+# Build artifacts
 *.exe
 *.dmg
 *.AppImage

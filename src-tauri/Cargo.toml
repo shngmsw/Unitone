@@ -1,0 +1,25 @@
+[package]
+name = "unitone"
+version = "1.0.0"
+description = "複数のチャットツールを1つにまとめるデスクトップアプリ"
+authors = ["shngmsw"]
+edition = "2021"
+
+[lib]
+name = "unitone_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["unstable", "tray-icon"] }
+tauri-plugin-store = "2"
+tauri-plugin-updater = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+url = "2"
+log = "0.4"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation"] }

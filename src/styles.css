@@ -1,0 +1,896 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  /* レイアウト */
+  --dock-width: 64px;
+  --ai-width: 400px;
+  --ai-min-width: 300px;
+  --ai-max-width: 800px;
+
+  /* スペーシング（8pxグリッド） - SHIG #85 整然とレイアウト */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+
+  /* カラー - SHIG #84 色を使いすぎない */
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #16213e;
+  --bg-tertiary: #0f3460;
+  --bg-elevated: #1e2a4a;
+  --text-primary: #eee;
+  --text-secondary: #aaa;
+  --text-disabled: #666;
+  --accent: #e94560;
+  --accent-hover: #ff6b6b;
+  --accent-subtle: rgba(233, 69, 96, 0.15);
+  --border-color: #333;
+  --border-focus: #e94560;
+
+  /* シャドウ - SHIG #4 シグニファイア（押せそうに見せる） */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.4);
+
+  /* トランジション - SHIG #63 アニメーション0.1-0.5秒 */
+  --transition-fast: 0.1s ease;
+  --transition-normal: 0.2s ease;
+  --transition-slow: 0.3s ease;
+
+  /* ボーダーラジウス */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  /* ボタンサイズ - SHIG #78 タッチ要素7mm以上（44px） */
+  --btn-size: 44px;
+  --btn-size-lg: 48px;
+}
+
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+/* アプリヘッダー（ドラッグ可能） */
+#app-header {
+  height: 32px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-sm);
+  user-select: none;
+}
+
+#app-header .app-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* macOS: トラフィックライト用スペース */
+body.platform-darwin #app-header {
+  padding-left: 80px;
+}
+
+/* Windows: ウィンドウコントロール用スペース */
+body.platform-win32 #app-header {
+  padding-right: 140px;
+}
+
+#app {
+  display: flex;
+  height: calc(100% - 32px);
+  /* no-drag: interactive elements */
+}
+
+/* L1: サービスドック - SHIG #10 視覚ゲシュタルト（近接でグループ化） */
+#service-dock {
+  width: var(--dock-width);
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-sm);
+  border-right: 1px solid var(--border-color);
+  /* drag region handled by data-tauri-drag-region attribute */
+}
+
+/* App logo at top of sidebar */
+#app-logo {
+  width: var(--btn-size-lg);
+  height: var(--btn-size-lg);
+  margin: 0 auto var(--space-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* no-drag: interactive elements */
+}
+
+#app-logo img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  opacity: 0.8;
+}
+
+#service-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  /* no-drag: interactive elements */
+}
+
+/* Windows: ヘッダーがあるのでpadding不要 */
+body.platform-win32 #service-dock {
+  padding-top: 8px;
+}
+
+body.platform-win32 #app-logo {
+  margin-top: 0;
+}
+
+/* Linux: 標準フレームなのでパディング不要 */
+body.platform-linux #service-dock {
+  padding-top: 8px;
+}
+
+body.platform-linux #app-logo {
+  margin-top: 0;
+}
+
+/* macOS: ヘッダーがあるのでpadding不要 */
+body.platform-darwin #service-dock {
+  padding-top: 8px;
+}
+
+.service-item {
+  width: var(--btn-size-lg);
+  height: var(--btn-size-lg);
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color var(--transition-normal),
+              transform var(--transition-fast),
+              box-shadow var(--transition-normal);
+  position: relative;
+  font-size: 22px;
+  border: none;
+  box-shadow: var(--shadow-sm);
+  /* SHIG #93 ホットスポット拡大のためにパディングで広げる */
+  padding: 0;
+}
+
+.service-item .service-favicon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+/* SHIG #74 ハイライト表現は構成要素を1つだけ変化 */
+.service-item:hover {
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-md);
+}
+
+/* SHIG #65 0.1秒以内に反応 */
+.service-item:active {
+  transform: scale(0.95);
+  transition: transform var(--transition-fast);
+}
+
+/* SHIG #6 一貫性 - アクティブ状態は左にインジケーター */
+.service-item.active {
+  background: var(--accent-subtle);
+}
+
+.service-item.active::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 24px;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+/* Drag and drop styles */
+.service-item[draggable="true"] {
+  cursor: grab;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.service-item.dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+  transform: scale(0.95);
+}
+
+/* ドロップインジケーター - 上 */
+.service-item.drag-over-above::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: -5px;
+  height: 3px;
+  background: var(--accent);
+  border-radius: 2px;
+  z-index: 10;
+}
+
+/* ドロップインジケーター - 下 */
+.service-item.drag-over-below::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: -5px;
+  height: 3px;
+  background: var(--accent);
+  border-radius: 2px;
+  z-index: 10;
+}
+
+/* SHIG #66 操作の近くでフィードバック */
+.service-item .badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: var(--accent);
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--space-xs);
+  box-shadow: var(--shadow-sm);
+}
+
+.service-item .badge.hidden {
+  display: none;
+}
+
+/* SHIG #10 視覚ゲシュタルト - アクションを別グループとして分離 */
+#dock-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding-top: var(--space-md);
+  margin-top: var(--space-sm);
+  border-top: 1px solid var(--border-color);
+  /* no-drag: interactive elements */
+}
+
+/* SHIG #4 シグニファイア - ボタンは押せそうに */
+.dock-btn {
+  width: var(--btn-size);
+  height: var(--btn-size);
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  border: none;
+  color: var(--text-secondary);
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color var(--transition-normal),
+              color var(--transition-normal),
+              transform var(--transition-fast);
+  box-shadow: var(--shadow-sm);
+}
+
+/* SHIG #74 ハイライトは1要素変化（背景色のみ） */
+.dock-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.dock-btn:active {
+  transform: scale(0.95);
+}
+
+/* L2: メインキャンバス */
+#main-canvas {
+  flex: 1;
+  position: relative;
+  background: var(--bg-primary);
+}
+
+#webview-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* WebView container - child webviews are managed by Tauri backend */
+#webview-container {
+  /* Tauri manages service webviews as child webviews */
+}
+
+/* SHIG #25 オブジェクトは自身の状態を体現する */
+#loading-indicator {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+#loading-indicator.hidden {
+  display: none;
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* L3: AIコンパニオン - SHIG #64 トランジションは両方向につける */
+#ai-companion {
+  width: var(--ai-width);
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  transition: width var(--transition-slow),
+              opacity var(--transition-slow);
+  position: relative;
+}
+
+#ai-companion.hidden {
+  width: 0 !important;
+  opacity: 0;
+  overflow: hidden;
+}
+
+#ai-companion.resizing {
+  transition: none !important;
+}
+
+/* リサイズ中はiframeがマウスイベントを奪わないように */
+body.resizing-active iframe {
+  pointer-events: none !important;
+}
+
+/* リサイズハンドル */
+#resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+  z-index: 10;
+  background: transparent;
+  transition: background-color var(--transition-fast);
+}
+
+#resize-handle:hover {
+  background: var(--accent-subtle);
+}
+
+#resize-handle:active,
+#ai-companion.resizing #resize-handle {
+  background: var(--accent);
+}
+
+#ai-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-tertiary);
+  font-weight: 600;
+  font-size: 14px;
+  min-height: 44px;
+  /* drag region handled by data-tauri-drag-region attribute */
+}
+
+/* SHIG #60 エスケープハッチ - 閉じるボタンは常にアクセス可能 */
+#ai-header > button,
+#close-ai-btn {
+  /* no-drag: interactive elements */
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 18px;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color var(--transition-fast),
+              color var(--transition-fast);
+}
+
+#ai-header > button:hover,
+#close-ai-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+/* AIセレクター */
+#ai-selector {
+  position: relative;
+  /* no-drag: interactive elements */
+}
+
+#ai-selector-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+#ai-selector-btn:hover {
+  background: var(--bg-primary);
+}
+
+.dropdown-arrow {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+#ai-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  min-width: 180px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 100;
+  overflow: hidden;
+}
+
+#ai-dropdown.hidden {
+  display: none;
+}
+
+.ai-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  cursor: pointer;
+  font-size: 13px;
+  transition: background var(--transition-fast);
+}
+
+.ai-dropdown-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.ai-dropdown-item.active {
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+
+.ai-dropdown-item .delete-ai-btn {
+  background: none;
+  border: none;
+  color: var(--text-disabled);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity var(--transition-fast), color var(--transition-fast);
+}
+
+.ai-dropdown-item:hover .delete-ai-btn {
+  opacity: 1;
+}
+
+.ai-dropdown-item .delete-ai-btn:hover {
+  color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.dropdown-add-btn {
+  display: block;
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  background: none;
+  border: none;
+  border-top: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.dropdown-add-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+#ai-webview-container {
+  flex: 1;
+  border: none;
+  /* AI webview is managed by Tauri backend */
+}
+
+/* モーダル - SHIG #60 エスケープハッチ（いつでも閉じられる） */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+  animation: modalFadeIn var(--transition-normal);
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal.hidden {
+  display: none;
+}
+
+/* SHIG #85 整然とレイアウトする */
+.modal-content {
+  background: var(--bg-secondary);
+  padding: var(--space-lg);
+  border-radius: var(--radius-lg);
+  min-width: 400px;
+  max-width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+  animation: modalSlideIn var(--transition-slow);
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-content h2 {
+  margin-bottom: var(--space-lg);
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* SHIG #40 入力フォームにはストーリー性を持たせる */
+/* SHIG #41 操作の流れを作る */
+.form-group {
+  margin-bottom: var(--space-md);
+}
+
+/* SHIG #11 ユーザーの言葉を使う */
+.form-group label {
+  display: block;
+  margin-bottom: var(--space-sm);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* SHIG #4 シグニファイア - 入力欄は入力できそうに見せる */
+/* SHIG #66 操作の近くでフィードバック */
+.form-group input {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 14px;
+  transition: border-color var(--transition-fast),
+              box-shadow var(--transition-fast);
+  min-height: var(--btn-size);
+}
+
+.form-group input::placeholder {
+  color: var(--text-disabled);
+}
+
+/* SHIG #65 0.1秒以内に反応を返す */
+.form-group input:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+/* SHIG #72 肯定/否定ボタンの順序はプラットフォームルールに従う */
+/* macOS: キャンセル左、実行右 */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  margin-top: var(--space-lg);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border-color);
+}
+
+/* SHIG #47 デフォルトボタンには具体的な動詞を用いる */
+/* SHIG #78 タッチ要素7mm以上 */
+.form-actions button {
+  padding: var(--space-sm) var(--space-md);
+  min-height: var(--btn-size);
+  min-width: 80px;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color var(--transition-fast),
+              transform var(--transition-fast);
+}
+
+.form-actions button[type="button"],
+.form-actions button:not([type="submit"]) {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* SHIG #4 シグニファイア - プライマリボタンは目立たせる */
+.form-actions button[type="submit"],
+.form-actions button:only-child {
+  background: var(--accent);
+  color: white;
+  box-shadow: var(--shadow-sm);
+}
+
+.form-actions button:hover {
+  filter: brightness(1.1);
+}
+
+.form-actions button:active {
+  transform: scale(0.98);
+}
+
+/* 設定リスト - SHIG #23 オブジェクトベース */
+#service-settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* SHIG #26 名詞→動詞の操作順序（サービスを選んでから削除） */
+.service-setting-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md);
+  background: var(--bg-primary);
+  border-radius: var(--radius-sm);
+  transition: background-color var(--transition-fast);
+}
+
+.service-setting-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.service-setting-item .service-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.service-setting-item .service-icon {
+  font-size: 24px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+}
+
+.service-setting-item .service-name {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.service-setting-item .service-url {
+  font-size: 12px;
+  color: var(--text-secondary);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.service-setting-item .service-actions {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.service-setting-item .edit-btn,
+.service-setting-item .delete-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color var(--transition-fast),
+              color var(--transition-fast);
+}
+
+.service-setting-item .edit-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.service-setting-item .delete-btn:hover {
+  background: rgba(233, 69, 96, 0.15);
+  color: var(--accent);
+}
+
+/* フォーカス可視化 - SHIG #96 色に依存させない */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ツールチップ代替（ネイティブtitle使用） */
+[title] {
+  position: relative;
+}
+
+/* 更新通知バナー */
+#update-banner {
+  position: fixed;
+  bottom: var(--space-md);
+  right: var(--space-md);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 2000;
+  max-width: 360px;
+  animation: slideInUp var(--transition-slow);
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+#update-banner.hidden {
+  display: none;
+}
+
+#update-content {
+  margin-bottom: var(--space-sm);
+}
+
+#update-message {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+#update-progress {
+  margin-top: var(--space-sm);
+  height: 4px;
+  background: var(--bg-tertiary);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+#update-progress.hidden {
+  display: none;
+}
+
+#update-progress-bar {
+  height: 100%;
+  background: var(--accent);
+  width: 0%;
+  transition: width var(--transition-fast);
+}
+
+#update-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+#update-actions button {
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background-color var(--transition-fast);
+}
+
+#update-actions .update-btn-secondary {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+#update-actions .update-btn-secondary:hover {
+  background: var(--bg-primary);
+}
+
+#update-actions .update-btn-primary {
+  background: var(--accent);
+  color: white;
+}
+
+#update-actions .update-btn-primary:hover {
+  filter: brightness(1.1);
+}
+
