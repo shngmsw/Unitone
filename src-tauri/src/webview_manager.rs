@@ -7,7 +7,7 @@ const HEADER_HEIGHT: f64 = 32.0;
 /// Chrome-compatible User-Agent string.
 /// macOS の WKWebView のデフォルト UA だと Slack や Google Chat に
 /// 「サポート対象外ブラウザ」と弾かれるため、Chrome の UA を偽装する。
-const CHROME_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+const CHROME_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36";
 
 pub struct LayoutParams {
     pub service_x: f64,
