@@ -406,6 +406,44 @@ pub fn remove_service_webview(
 }
 
 #[tauri::command]
+pub fn hide_all_child_webviews(app: AppHandle, state: State<Mutex<AppState>>) {
+    let s = state.lock().unwrap();
+    
+    // 現在アクティブなサービスのWebviewを隠す
+    if !s.active_service_id.is_empty() {
+        let label = format!("service-{}", s.active_service_id);
+        if let Some(ww) = app.get_webview_window(&label) {
+            let _ = ww.hide();
+        }
+    }
+    
+    // AIコンパニオンを隠す
+    if let Some(ww) = app.get_webview_window("ai-webview") {
+        let _ = ww.hide();
+    }
+}
+
+#[tauri::command]
+pub fn restore_child_webviews(app: AppHandle, state: State<Mutex<AppState>>) {
+    let s = state.lock().unwrap();
+    
+    // アクティブなサービスが選択されていれば再表示
+    if !s.active_service_id.is_empty() {
+        let label = format!("service-{}", s.active_service_id);
+        if let Some(ww) = app.get_webview_window(&label) {
+            let _ = ww.show();
+        }
+    }
+    
+    // AIコンパニオンが有効なら再表示
+    if s.show_ai_companion {
+        if let Some(ww) = app.get_webview_window("ai-webview") {
+            let _ = ww.show();
+        }
+    }
+}
+
+#[tauri::command]
 pub fn create_ai_webview(
     app: AppHandle,
     state: State<Mutex<AppState>>,

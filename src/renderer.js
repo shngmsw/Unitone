@@ -85,7 +85,7 @@ class Hitotone {
       if (this.services.length === 0) {
         console.log('[Hitotone] No services found, showing onboarding');
         const onboarding = document.getElementById('onboarding-screen');
-        if (onboarding) onboarding.classList.remove('hidden');
+        if (onboarding) this.showModal(onboarding);
       } else if (this.activeServiceId) {
         // ... (check validity of activeServiceId?)
         // wait, earlier if activeServiceId doesn't exist in services, fallback to services[0].
@@ -108,6 +108,23 @@ class Hitotone {
     } catch (error) {
       console.error('Hitotone initialization failed:', error);
       console.error('Error stack:', error.stack || error);
+    }
+  }
+
+  async showModal(modalElement) {
+    if (!modalElement) return;
+    await invoke('hide_all_child_webviews');
+    modalElement.classList.remove('hidden');
+  }
+
+  async hideModal(modalElement) {
+    if (!modalElement) return;
+    modalElement.classList.add('hidden');
+
+    // 他のモーダルが開いていないか確認
+    const anyOpen = Array.from(document.querySelectorAll('.modal, #onboarding-screen')).some(m => !m.classList.contains('hidden'));
+    if (!anyOpen) {
+      await invoke('restore_child_webviews');
     }
   }
 }

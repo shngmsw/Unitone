@@ -29,7 +29,7 @@ export class EventManager {
       addAiBtn.addEventListener('click', () => {
         this.hitotone.aiCompanionManager.toggleDropdown(false);
         const modal = document.getElementById('add-ai-modal');
-        if (modal) modal.classList.remove('hidden');
+        if (modal) this.hitotone.showModal(modal);
       });
     }
 
@@ -38,7 +38,7 @@ export class EventManager {
       cancelAddAiBtn.addEventListener('click', () => {
         const modal = document.getElementById('add-ai-modal');
         const form = document.getElementById('add-ai-form');
-        if (modal) modal.classList.add('hidden');
+        if (modal) this.hitotone.hideModal(modal);
         if (form) form.reset();
       });
     }
@@ -58,7 +58,7 @@ export class EventManager {
         this.hitotone.aiCompanionManager.renderDropdown();
 
         const modal = document.getElementById('add-ai-modal');
-        if (modal) modal.classList.add('hidden');
+        if (modal) this.hitotone.hideModal(modal);
         if (addAiForm) addAiForm.reset();
       });
     }
@@ -78,7 +78,7 @@ export class EventManager {
     if (addServiceBtn) {
       addServiceBtn.addEventListener('click', () => {
         const modal = document.getElementById('add-service-modal');
-        if (modal) modal.classList.remove('hidden');
+        if (modal) this.hitotone.showModal(modal);
       });
     }
 
@@ -86,7 +86,7 @@ export class EventManager {
     if (onboardingAddServiceBtn) {
       onboardingAddServiceBtn.addEventListener('click', () => {
         const modal = document.getElementById('add-service-modal');
-        if (modal) modal.classList.remove('hidden');
+        if (modal) this.hitotone.showModal(modal);
       });
     }
 
@@ -95,7 +95,7 @@ export class EventManager {
       cancelAddBtn.addEventListener('click', () => {
         const modal = document.getElementById('add-service-modal');
         const form = document.getElementById('add-service-form');
-        if (modal) modal.classList.add('hidden');
+        if (modal) this.hitotone.hideModal(modal);
         if (form) form.reset();
       });
     }
@@ -123,17 +123,17 @@ export class EventManager {
             serviceId: newService.id,
             url: newService.url
           });
-          
+
           // 初めてのサービス追加の場合、オンボーディングを隠してそのサービスに切り替え
           if (this.hitotone.services.length === 1) {
             const onboarding = document.getElementById('onboarding-screen');
-            if (onboarding) onboarding.classList.add('hidden');
+            if (onboarding) this.hitotone.hideModal(onboarding);
             await this.hitotone.webViewManager.switchService(newService.id);
           }
         }
 
         const modal = document.getElementById('add-service-modal');
-        if (modal) modal.classList.add('hidden');
+        if (modal) this.hitotone.hideModal(modal);
         if (addServiceForm) addServiceForm.reset();
       });
     }
@@ -142,7 +142,7 @@ export class EventManager {
     if (cancelEditBtn) {
       cancelEditBtn.addEventListener('click', () => {
         const modal = document.getElementById('edit-service-modal');
-        if (modal) modal.classList.add('hidden');
+        if (modal) this.hitotone.hideModal(modal);
       });
     }
 
@@ -176,7 +176,7 @@ export class EventManager {
         }
 
         const modal = document.getElementById('edit-service-modal');
-        if (modal) modal.classList.add('hidden');
+        if (modal) this.hitotone.hideModal(modal);
         this.hitotone.settingsManager.open();
       });
     }
@@ -214,7 +214,7 @@ export class EventManager {
     document.querySelectorAll('.modal').forEach(modal => {
       modal.addEventListener('click', (e) => {
         if (e.target === modal) {
-          modal.classList.add('hidden');
+          this.hitotone.hideModal(modal);
         }
       });
     });
@@ -234,9 +234,10 @@ export class EventManager {
       // Escape でモーダルを閉じる
       if (e.key === 'Escape') {
         document.querySelectorAll('.modal:not(.hidden)').forEach(modal => {
-          modal.classList.add('hidden');
+          this.hitotone.hideModal(modal);
         });
       }
+
     });
   }
 

@@ -97,7 +97,7 @@ export class SettingsManager {
             // 全てのサービスが削除された場合はオンボーディングを表示
             this.hitotone.activeServiceId = null;
             const onboarding = document.getElementById('onboarding-screen');
-            if (onboarding) onboarding.classList.remove('hidden');
+            if (onboarding) this.hitotone.showModal(onboarding);
           }
 
           this.open(); // リストを更新
@@ -107,7 +107,7 @@ export class SettingsManager {
 
     const modal = document.getElementById('settings-modal');
     if (modal) {
-      modal.classList.remove('hidden');
+      this.hitotone.showModal(modal);
     }
   }
 
@@ -127,14 +127,14 @@ export class SettingsManager {
 
     const modal = document.getElementById('edit-service-modal');
     if (modal) {
-      modal.classList.remove('hidden');
+      this.hitotone.showModal(modal);
     }
   }
 
   close() {
     const modal = document.getElementById('settings-modal');
     if (modal) {
-      modal.classList.add('hidden');
+      this.hitotone.hideModal(modal);
     }
   }
 }

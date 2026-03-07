@@ -52,6 +52,8 @@ pub fn run() {
             commands::update_notification_count,
             commands::update_favicon,
             commands::open_popup_window,
+            commands::hide_all_child_webviews,
+            commands::restore_child_webviews,
         ])
         .on_window_event(|window, event| {
             let app_handle = window.app_handle();
