@@ -67,7 +67,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          npx semantic-release 2>&1 | tee release-output.txt
+          # semantic-releaseを実行
+          npx semantic-release > release-output.txt 2>&1 || (cat release-output.txt && exit 1)
+          cat release-output.txt
+
           if grep -q "Published release" release-output.txt; then
             echo "release_created=true" >> $GITHUB_OUTPUT
           else
