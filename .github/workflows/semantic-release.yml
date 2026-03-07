@@ -10,13 +10,36 @@ permissions:
   issues: write
   pull-requests: write
 
+concurrency:
+  group: semantic-release
+  cancel-in-progress: false
+
 jobs:
+  # リリース前にビルドが通るか確認（CI環境として）
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, ubuntu-22.04, windows-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install dependencies
+        run: npm ci
+      - name: Build check
+        run: npm run build
+
   release:
+    needs: check
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.semantic-release.outputs.release_created }}
       tag_name: ${{ steps.get-tag.outputs.tag_name }}
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -38,10 +61,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # semantic-releaseの出力をキャプチャ
           npx semantic-release 2>&1 | tee release-output.txt
-
-          # リリースが作成されたか確認（新しいバージョンが公開された場合）
           if grep -q "Published release" release-output.txt; then
             echo "release_created=true" >> $GITHUB_OUTPUT
           else
@@ -52,14 +72,12 @@ jobs:
         id: get-tag
         if: steps.semantic-release.outputs.release_created == 'true'
         run: |
-          # 最新のタグを取得
           git fetch --tags
           LATEST_TAG=$(git describe --tags --abbrev=0)
           echo "tag_name=$LATEST_TAG" >> $GITHUB_OUTPUT
-          echo "Latest tag: $LATEST_TAG"
 
-  # リリースが作成された場合、ビルドを実行
-  build:
+  # リリースが作成された場合、各プラットフォームのバイナリをビルドしてリリースに添付
+  upload-assets:
     needs: release
     if: needs.release.outputs.release_created == 'true'
     uses: ./.github/workflows/release.yml
