@@ -82,6 +82,14 @@ export class EventManager {
       });
     }
 
+    const onboardingAddServiceBtn = document.getElementById('onboarding-add-service-btn');
+    if (onboardingAddServiceBtn) {
+      onboardingAddServiceBtn.addEventListener('click', () => {
+        const modal = document.getElementById('add-service-modal');
+        if (modal) modal.classList.remove('hidden');
+      });
+    }
+
     const cancelAddBtn = document.getElementById('cancel-add-btn');
     if (cancelAddBtn) {
       cancelAddBtn.addEventListener('click', () => {
@@ -115,6 +123,13 @@ export class EventManager {
             serviceId: newService.id,
             url: newService.url
           });
+          
+          // 初めてのサービス追加の場合、オンボーディングを隠してそのサービスに切り替え
+          if (this.hitotone.services.length === 1) {
+            const onboarding = document.getElementById('onboarding-screen');
+            if (onboarding) onboarding.classList.add('hidden');
+            await this.hitotone.webViewManager.switchService(newService.id);
+          }
         }
 
         const modal = document.getElementById('add-service-modal');

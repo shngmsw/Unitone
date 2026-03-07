@@ -70,7 +70,7 @@ pub fn get_layout_params(main_ww: &tauri::WebviewWindow, state: &AppState) -> Op
 }
 
 /// OAuth/認証関連のURLかどうかを判定する
-fn is_auth_url(url: &str) -> bool {
+pub fn is_auth_url(url: &str) -> bool {
     url.contains("accounts.google.com")
         || url.contains("login.microsoftonline.com")
         || url.contains("github.com/login/oauth")
@@ -90,6 +90,9 @@ pub fn create_service_webview_window(
     let parsed_url: url::Url = url.parse().map_err(|e: url::ParseError| e.to_string())?;
     let app_for_nav = app.clone();
 
+    let source_label = label.to_string();
+    let target_domain = parsed_url.host_str().unwrap_or("").to_string();
+
     // Create hidden, then SetParent, then position with relative coords
     let ww = tauri::WebviewWindowBuilder::new(
         app,
@@ -108,10 +111,13 @@ pub fn create_service_webview_window(
         if is_auth_url(url_str) {
             let owned = url_str.to_string();
             let app2 = app_for_nav.clone();
+            let s_label = source_label.clone();
+            let t_domain = target_domain.clone();
+            
             std::thread::spawn(move || {
                 // 少し待ってからポップアップを開く（WebView2のナビゲーションキャンセル後に実行）
                 std::thread::sleep(std::time::Duration::from_millis(50));
-                crate::commands::open_popup_window_internal(&app2, owned);
+                crate::commands::open_popup_window_internal(&app2, owned, Some(s_label), Some(t_domain));
             });
             return false; // ナビゲーションをキャンセル
         }

@@ -64,40 +64,7 @@ pub struct AppState {
 impl Default for AppState {
     fn default() -> Self {
         Self {
-            services: vec![
-                Service {
-                    id: "slack".to_string(),
-                    name: "Slack".to_string(),
-                    url: "https://app.slack.com".to_string(),
-                    icon: "\u{1F4AC}".to_string(), // 💬
-                    enabled: true,
-                    favicon_url: None,
-                },
-                Service {
-                    id: "gchat".to_string(),
-                    name: "Google Chat".to_string(),
-                    url: "https://chat.google.com".to_string(),
-                    icon: "\u{1F4AD}".to_string(), // 💭
-                    enabled: true,
-                    favicon_url: None,
-                },
-                Service {
-                    id: "teams".to_string(),
-                    name: "Teams".to_string(),
-                    url: "https://teams.microsoft.com".to_string(),
-                    icon: "\u{1F465}".to_string(), // 👥
-                    enabled: true,
-                    favicon_url: None,
-                },
-                Service {
-                    id: "chatwork".to_string(),
-                    name: "Chatwork".to_string(),
-                    url: "https://www.chatwork.com".to_string(),
-                    icon: "\u{1F4DD}".to_string(), // 📝
-                    enabled: true,
-                    favicon_url: None,
-                },
-            ],
+            services: Vec::new(),
             ai_services: vec![
                 AiService {
                     id: "gemini".to_string(),
@@ -118,7 +85,7 @@ impl Default for AppState {
                     is_default: true,
                 },
             ],
-            active_service_id: "slack".to_string(),
+            active_service_id: "".to_string(),
             active_ai_service_id: "gemini".to_string(),
             show_ai_companion: true,
             ai_width: 400,

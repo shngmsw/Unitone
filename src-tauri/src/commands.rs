@@ -531,8 +531,12 @@ pub fn send_to_ai_webview(app: AppHandle, text: String) -> Result<(), String> {
 // Popup window
 // ========================================
 
-/// ポップアップウィンドウを開く内部関数（webview_manager.rsからも呼び出し可能）
-pub fn open_popup_window_internal(app: &tauri::AppHandle, url: String) {
+pub fn open_popup_window_internal(
+    app: &tauri::AppHandle,
+    url: String,
+    source_label: Option<String>,
+    target_domain: Option<String>,
+) {
     println!("[open_popup_window] Opening popup: {}", url);
 
     let parsed_url = match url.parse::<url::Url>() {
@@ -564,37 +568,59 @@ pub fn open_popup_window_internal(app: &tauri::AppHandle, url: String) {
         let url_str = nav_url.as_str();
         println!("[popup-auth] navigating to: {}", url_str);
 
-        // Slackワークスペースへの到達を検知して認証完了とみなす
-        // app.slack.com または *.slack.com (signin/oauth以外)
-        let is_slack_workspace = (url_str.contains("app.slack.com")
-            || (url_str.contains(".slack.com") && !url_str.contains("accounts.google")))
-            && !url_str.contains("/signin")
-            && !url_str.contains("/oauth")
-            && !url_str.contains("/sso")
-            && !url_str.contains("oauth2.slack.com");
+        // 汎用的な認証完了判定
+        // 遷移先のURLが、元のサービスURLのドメインを含んでいて、かつ認証系のパスでない場合を完了とみなす
+        let mut is_auth_complete = false;
 
-        if is_slack_workspace {
-            println!("[popup-auth] workspace reached! navigating main slack webview");
+        if let Some(ref domain) = target_domain {
+            if url_str.contains(domain) && !crate::webview_manager::is_auth_url(url_str) {
+                is_auth_complete = true;
+            }
+        } else {
+            // Slack等のハードコードにフォールバック（レガシー対応）
+            is_auth_complete = (url_str.contains("app.slack.com")
+                || (url_str.contains(".slack.com") && !url_str.contains("accounts.google")))
+                && !url_str.contains("/signin")
+                && !url_str.contains("/oauth")
+                && !url_str.contains("/sso")
+                && !url_str.contains("oauth2.slack.com");
+        }
+
+        if is_auth_complete {
+            println!("[popup-auth] Auth completed! returning to main webview");
             let owned_url = url_str.to_string();
             let app2 = app_for_nav.clone();
+            let pop_source_label = source_label.clone();
+            
             std::thread::spawn(move || {
-                // AppStateからSlack系のWebViewを探してナビゲート
-                let slack_label = {
-                    let state = app2.state::<std::sync::Mutex<AppState>>();
-                    let s = state.lock().unwrap();
-                    s.services
-                        .iter()
-                        .find(|svc| svc.url.contains("slack.com"))
-                        .map(|svc| format!("service-{}", svc.id))
-                };
-                if let Some(label) = slack_label {
-                    if let Some(slack_ww) = app2.get_webview_window(&label) {
+                // 呼び出し元のWebViewがあればそこにナビゲート
+                if let Some(label) = pop_source_label {
+                    if let Some(ww) = app2.get_webview_window(&label) {
                         if let Ok(u) = owned_url.parse::<url::Url>() {
-                            let _ = slack_ww.navigate(u);
+                            let _ = ww.navigate(u);
                         }
-                        let _ = slack_ww.show();
+                        let _ = ww.show();
+                    }
+                } else {
+                    // sourceが無い場合は従来通りSlackを探す
+                    let slack_label = {
+                        let state = app2.state::<std::sync::Mutex<crate::state::AppState>>();
+                        let s = state.lock().unwrap();
+                        s.services
+                            .iter()
+                            .find(|svc| svc.url.contains("slack.com"))
+                            .map(|svc| format!("service-{}", svc.id))
+                    };
+                    if let Some(label) = slack_label {
+                        if let Some(slack_ww) = app2.get_webview_window(&label) {
+                            if let Ok(u) = owned_url.parse::<url::Url>() {
+                                let _ = slack_ww.navigate(u);
+                            }
+                            let _ = slack_ww.show();
+                        }
                     }
                 }
+
                 let _ = app2.emit("auth-completed", &owned_url);
                 std::thread::sleep(std::time::Duration::from_millis(1000));
                 if let Some(w) = app2.get_webview_window("popup-auth") {
@@ -618,7 +644,7 @@ pub fn open_popup_window_internal(app: &tauri::AppHandle, url: String) {
 
 #[tauri::command]
 pub fn open_popup_window(app: AppHandle, url: String) -> Result<(), String> {
-    open_popup_window_internal(&app, url);
+    open_popup_window_internal(&app, url, None, None);
     Ok(())
 }
 

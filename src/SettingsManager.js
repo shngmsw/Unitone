@@ -93,6 +93,11 @@ export class SettingsManager {
 
           if (this.hitotone.activeServiceId === serviceId && this.hitotone.services.length > 0) {
             await this.hitotone.webViewManager.switchService(this.hitotone.services[0].id);
+          } else if (this.hitotone.services.length === 0) {
+            // 全てのサービスが削除された場合はオンボーディングを表示
+            this.hitotone.activeServiceId = null;
+            const onboarding = document.getElementById('onboarding-screen');
+            if (onboarding) onboarding.classList.remove('hidden');
           }
 
           this.open(); // リストを更新

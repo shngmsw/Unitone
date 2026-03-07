@@ -81,9 +81,22 @@ class Hitotone {
       }
 
       // 初期サービスをアクティブに
-      if (this.activeServiceId) {
-        console.log('[Hitotone] switching to active service:', this.activeServiceId);
-        await this.webViewManager.switchService(this.activeServiceId);
+      // 初期サービスをアクティブに
+      if (this.services.length === 0) {
+        console.log('[Hitotone] No services found, showing onboarding');
+        const onboarding = document.getElementById('onboarding-screen');
+        if (onboarding) onboarding.classList.remove('hidden');
+      } else if (this.activeServiceId) {
+        // ... (check validity of activeServiceId?)
+        // wait, earlier if activeServiceId doesn't exist in services, fallback to services[0].
+        const hasActiveService = this.services.find(s => s.id === this.activeServiceId);
+        if (hasActiveService) {
+          console.log('[Hitotone] switching to active service:', this.activeServiceId);
+          await this.webViewManager.switchService(this.activeServiceId);
+        } else {
+          console.log('[Hitotone] switching to first service:', this.services[0].id);
+          await this.webViewManager.switchService(this.services[0].id);
+        }
       } else if (this.services.length > 0) {
         console.log('[Hitotone] switching to first service:', this.services[0].id);
         await this.webViewManager.switchService(this.services[0].id);
