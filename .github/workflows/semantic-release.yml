@@ -1,9 +1,12 @@
 name: Semantic Release
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (no actual release)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write

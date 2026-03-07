@@ -1,6 +1,6 @@
 [package]
 name = "hitotone"
-version = "1.0.0"
+version = "0.1.0"
 description = "複数のチャットツールを1つにまとめるデスクトップアプリ"
 authors = ["shngmsw"]
 edition = "2021"
