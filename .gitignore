@@ -24,3 +24,8 @@ src-dist/
 .claude/
 .specstory/
 image.png
+
+# Local CI (act)
+act.exe
+act.zip
+release-output.txt
