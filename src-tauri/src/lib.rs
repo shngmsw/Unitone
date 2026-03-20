@@ -15,6 +15,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_shell::init())
         .manage(Mutex::new(app_state))
         .invoke_handler(tauri::generate_handler![
             commands::get_services,

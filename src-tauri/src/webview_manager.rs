@@ -1,5 +1,6 @@
 use crate::state::AppState;
 use tauri::Manager;
+use tauri_plugin_shell::ShellExt;
 
 const DOCK_WIDTH: f64 = 64.0;
 const HEADER_HEIGHT: f64 = 32.0;
@@ -59,36 +60,36 @@ const BROWSER_SPOOF_SCRIPT: &str = r#"
     configurable: true
   });
 
-  // === window.open を同じウィンドウ内ナビゲーションに変換 (DOM 不要) ===
-  var _origOpen = window.open;
-  window.open = function(url, target, features) {
-    if (url && url !== '' && url !== 'about:blank') {
-      try {
-        var fullUrl = new URL(url, window.location.href).href;
-        console.log('[window.open -> navigate]', fullUrl);
-        window.location.href = fullUrl;
-      } catch(e) {
-        console.error('[window.open] error:', e);
+    // === window.open 等を同じウィンドウ内ナビゲーションに変換し、Rust 側の on_navigation で制御する ===
+    var _origOpen = window.open;
+    window.open = function(url, target, features) {
+      if (url && url !== '' && url !== 'about:blank') {
+        try {
+          var fullUrl = new URL(url, window.location.href).href;
+          console.log('[window.open -> same-window navigate]', fullUrl);
+          window.location.href = fullUrl;
+        } catch(e) {
+          console.error('[window.open] error:', e);
+        }
+        return null;
       }
-      return null;
-    }
-    return _origOpen ? _origOpen.call(window, url, target, features) : null;
-  };
+      return _origOpen ? _origOpen.call(window, url, target, features) : null;
+    };
 
-  // === DOM 準備後に実行する処理 ===
-  function onReady() {
-    // target="_blank" リンクを同じウィンドウで開く
-    document.addEventListener('click', function(e) {
-      var link = e.target.closest && e.target.closest('a[target="_blank"], a[target="new"]');
-      if (link && link.href) {
-        e.preventDefault();
-        e.stopPropagation();
-        console.log('[target=_blank -> navigate]', link.href);
-        window.location.href = link.href;
-      }
-    }, true);
+    // === DOM 準備後に実行する処理 ===
+    function onReady() {
+      // target="_blank" 等のリンクを同じウィンドウで開く（Rust の on_navigation でブラウザ送りにするため）
+      document.addEventListener('click', function(e) {
+        var link = e.target.closest && e.target.closest('a[target="_blank"], a[target="new"]');
+        if (link && link.href) {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('[target=_blank -> same-window navigate]', link.href);
+          window.location.href = link.href;
+        }
+      }, true);
 
-    // 非推奨バナーを非表示にする CSS
+      // 非推奨バナーを非表示にする CSS
     var style = document.createElement('style');
     style.textContent = [
       '[data-qa="browser_deprecation_banner"] { display: none !important; }',
@@ -227,7 +228,7 @@ pub fn create_service_webview_window(
     let ww = tauri::WebviewWindowBuilder::new(
         app,
         label,
-        tauri::WebviewUrl::External(parsed_url),
+        tauri::WebviewUrl::External(parsed_url.clone()),
     )
     .title(&format!("Hitotone - {}", label))
     .inner_size(layout.service_width, layout.service_height)
@@ -236,9 +237,19 @@ pub fn create_service_webview_window(
     .visible(false)
     .user_agent(CHROME_USER_AGENT)
     .initialization_script(&browser_spoof_script())
-    .on_navigation(move |nav_url| {
-        println!("[service-nav] {}", nav_url.as_str());
-        true // すべてのナビゲーションをそのまま許可（ポップアップ分離はしない）
+    .on_navigation({
+        let app_handle = app.clone();
+        let initial_url = parsed_url.clone();
+        move |nav_url| {
+            println!("[service-nav] {}", nav_url.as_str());
+            // ドメインが異なり、かつ認証用URLでもない場合は既定のブラウザで開く
+            if nav_url.host_str() != initial_url.host_str() && !is_auth_url(nav_url.as_str()) {
+                println!("[service-nav] Opening external link in browser: {}", nav_url.as_str());
+                let _ = app_handle.shell().open(nav_url.as_str(), None);
+                return false; // アプリ内でのナビゲーションをキャンセル
+            }
+            true
+        }
     })
     .build()
     .map_err(|e| e.to_string())?;
@@ -275,7 +286,7 @@ pub fn create_ai_webview_window(
     let ww = tauri::WebviewWindowBuilder::new(
         app,
         "ai-webview",
-        tauri::WebviewUrl::External(parsed_url),
+        tauri::WebviewUrl::External(parsed_url.clone()),
     )
     .title("Hitotone - AI")
     .inner_size(layout.ai_width, layout.ai_height)
@@ -284,6 +295,19 @@ pub fn create_ai_webview_window(
     .visible(false)
     .user_agent(CHROME_USER_AGENT)
     .initialization_script(&browser_spoof_script())
+    .on_navigation({
+        let app_handle = app.clone();
+        let initial_url = parsed_url.clone();
+        move |nav_url| {
+            println!("[ai-nav] {}", nav_url.as_str());
+            if nav_url.host_str() != initial_url.host_str() && !is_auth_url(nav_url.as_str()) {
+                println!("[ai-nav] Opening external link in browser: {}", nav_url.as_str());
+                let _ = app_handle.shell().open(nav_url.as_str(), None);
+                return false;
+            }
+            true
+        }
+    })
     .build()
     .map_err(|e| e.to_string())?;
 

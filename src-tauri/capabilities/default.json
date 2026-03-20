@@ -24,6 +24,20 @@
     "core:webview:allow-create-webview",
     "core:webview:allow-create-webview-window",
     "store:default",
-    "updater:default"
+    "updater:default",
+    "shell:default",
+    {
+      "identifier": "shell:allow-open",
+      "allow": [
+        {
+          "schemes": [
+            "http",
+            "https",
+            "mailto",
+            "tel"
+          ]
+        }
+      ]
+    }
   ]
-}
+}
