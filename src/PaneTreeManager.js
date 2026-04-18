@@ -183,7 +183,7 @@ export class PaneTreeManager {
           invoke('focus_pane', { paneId }).catch(console.error);
         }
 
-        this._openServicePicker(btn, paneId, currentSvcId);
+        this._openServicePicker(btn, paneId, currentSvcId).catch(console.error);
       });
     });
 
@@ -219,8 +219,11 @@ export class PaneTreeManager {
     });
   }
 
-  _openServicePicker(anchor, paneId, currentSvcId) {
+  async _openServicePicker(anchor, paneId, currentSvcId) {
     this._closeServicePicker();
+
+    // Native webviews sit above HTML — hide them so dropdown is visible
+    await invoke('hide_all_child_webviews').catch(console.error);
 
     const services = this.app?.services ?? [];
     const usedIds = new Set(this._collectServiceIds(this.tree));
@@ -286,7 +289,11 @@ export class PaneTreeManager {
   }
 
   _closeServicePicker() {
+    const wasOpen = document.querySelectorAll('.service-picker-menu').length > 0;
     document.querySelectorAll('.service-picker-menu').forEach(el => el.remove());
+    if (wasOpen) {
+      invoke('restore_child_webviews').catch(console.error);
+    }
   }
 
   _onDocumentClick() {

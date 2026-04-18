@@ -503,15 +503,12 @@ pub async fn hide_all_child_webviews(
     app: AppHandle,
     state: State<'_, RwLock<AppState>>,
 ) -> Result<(), ()> {
-    let active_service_id = state.read().await.active_service_id.clone();
-
-    if !active_service_id.is_empty() {
-        let label = format!("service-{}", active_service_id);
-        if let Some(wv) = app.get_webview(&label) {
+    let labels = state.read().await.created_webview_labels.clone();
+    for label in &labels {
+        if let Some(wv) = app.get_webview(label) {
             let _ = wv.hide();
         }
     }
-
     if let Some(wv) = app.get_webview("ai-webview") {
         let _ = wv.hide();
     }
@@ -523,23 +520,8 @@ pub async fn restore_child_webviews(
     app: AppHandle,
     state: State<'_, RwLock<AppState>>,
 ) -> Result<(), ()> {
-    let (active_service_id, show_ai_companion) = {
-        let s = state.read().await;
-        (s.active_service_id.clone(), s.show_ai_companion)
-    };
-
-    if !active_service_id.is_empty() {
-        let label = format!("service-{}", active_service_id);
-        if let Some(wv) = app.get_webview(&label) {
-            let _ = wv.show();
-        }
-    }
-
-    if show_ai_companion {
-        if let Some(wv) = app.get_webview("ai-webview") {
-            let _ = wv.show();
-        }
-    }
+    let snapshot = state.read().await.clone();
+    webview_manager::update_layout(&app, &snapshot);
     Ok(())
 }
 
