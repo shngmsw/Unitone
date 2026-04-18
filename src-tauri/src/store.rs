@@ -62,31 +62,31 @@ pub fn save_state(app: &AppHandle, state: &AppState) {
         Err(_) => return,
     };
 
-    let _ = store.set(
+    store.set(
         "services",
         serde_json::to_value(&state.services).unwrap_or_default(),
     );
-    let _ = store.set(
+    store.set(
         "aiServices",
         serde_json::to_value(&state.ai_services).unwrap_or_default(),
     );
-    let _ = store.set(
+    store.set(
         "activeServiceId",
         serde_json::Value::String(state.active_service_id.clone()),
     );
-    let _ = store.set(
+    store.set(
         "activeAiServiceId",
         serde_json::Value::String(state.active_ai_service_id.clone()),
     );
-    let _ = store.set(
+    store.set(
         "showAiCompanion",
         serde_json::Value::Bool(state.show_ai_companion),
     );
-    let _ = store.set(
+    store.set(
         "aiWidth",
         serde_json::Value::Number(serde_json::Number::from(state.ai_width)),
     );
-    let _ = store.set(
+    store.set(
         "windowBounds",
         serde_json::to_value(&state.window_bounds).unwrap_or_default(),
     );
@@ -99,7 +99,7 @@ pub fn save_services(app: &AppHandle, services: &[Service]) {
         Ok(s) => s,
         Err(_) => return,
     };
-    let _ = store.set(
+    store.set(
         "services",
         serde_json::to_value(services).unwrap_or_default(),
     );
@@ -111,7 +111,7 @@ pub fn save_ai_services(app: &AppHandle, ai_services: &[AiService]) {
         Ok(s) => s,
         Err(_) => return,
     };
-    let _ = store.set(
+    store.set(
         "aiServices",
         serde_json::to_value(ai_services).unwrap_or_default(),
     );
@@ -123,6 +123,6 @@ pub fn save_value<T: serde::Serialize>(app: &AppHandle, key: &str, value: &T) {
         Ok(s) => s,
         Err(_) => return,
     };
-    let _ = store.set(key, serde_json::to_value(value).unwrap_or_default());
+    store.set(key, serde_json::to_value(value).unwrap_or_default());
     let _ = store.save();
 }

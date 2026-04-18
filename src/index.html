@@ -10,24 +10,7 @@
 
 <body>
   <!-- アプリヘッダー（ドラッグでウィンドウ移動可能） -->
-  <header id="app-header" data-tauri-drag-region>
-    <span class="app-title">Hitotone</span>
-  </header>
-
   <div id="app">
-    <!-- L1: サービスドック -->
-    <aside id="service-dock">
-      <div id="app-logo">
-        <img src="../assets/icons/icon.png" alt="Hitotone">
-      </div>
-      <div id="service-list"></div>
-      <div id="dock-actions">
-        <button id="add-service-btn" class="dock-btn" title="サービスを追加">+</button>
-        <button id="toggle-ai-btn" class="dock-btn" title="AIコンパニオンを切り替え">AI</button>
-        <button id="settings-btn" class="dock-btn" title="設定">⚙</button>
-      </div>
-    </aside>
-
     <!-- L2: メインキャンバス (WebViews managed by Tauri backend) -->
     <main id="main-canvas">
       <div id="webview-container"></div>
@@ -89,7 +72,7 @@
     <aside id="ai-companion" class="hidden">
       <div id="resize-handle" title="ドラッグして幅を変更" tabindex="0" role="separator" aria-orientation="vertical"
         aria-label="サイドバーの幅を変更"></div>
-      <div id="ai-header" data-tauri-drag-region>
+      <div id="ai-header">
         <div id="ai-selector">
           <button id="ai-selector-btn" title="AIを切り替え">
             <span id="ai-current-name">Gemini</span>

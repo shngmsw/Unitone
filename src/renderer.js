@@ -1,6 +1,7 @@
 // Hitotone Renderer Process - Main Entry Point (Tauri v2)
 
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { AiCompanionManager } from './AiCompanionManager.js';
 import { EventManager } from './EventManager.js';
 import { LoadingManager } from './LoadingManager.js';
@@ -62,6 +63,15 @@ class Hitotone {
       // リサイズハンドルを設定
       this.aiCompanionManager.setupResizeHandle();
 
+      // ウィンドウリサイズ時のレイアウト更新（RustのネイティブスレッドではなくJSから非同期で呼ぶ）
+      let resizeTimeout;
+      window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+          invoke('update_layout').catch(console.error);
+        }, 50);
+      });
+
       // WebViewをRust側で作成
       try {
         console.log('[Hitotone] creating webviews...');
@@ -101,6 +111,17 @@ class Hitotone {
         console.log('[Hitotone] switching to first service:', this.services[0].id);
         await this.webViewManager.switchService(this.services[0].id);
       }
+
+      // chrome WebView からのモーダル開要求をリッスン
+      listen('open-modal', (e) => {
+        const modalType = e.payload;
+        if (modalType === 'add-service') {
+          const modal = document.getElementById('add-service-modal');
+          if (modal) this.showModal(modal);
+        } else if (modalType === 'settings') {
+          this.settingsManager.open();
+        }
+      });
 
       // ローディング非表示
       this.loadingManager.hide();

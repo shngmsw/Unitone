@@ -4,6 +4,22 @@ use crate::webview_manager;
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, State};
 
+/// chrome WebView から modal 表示をリクエスト。service/AI WebView を隠してから親に通知。
+#[tauri::command]
+pub fn request_open_modal(app: AppHandle, state: State<Mutex<AppState>>, modal_type: String) {
+    let active_service_id = state.lock().unwrap().active_service_id.clone();
+    if !active_service_id.is_empty() {
+        let label = format!("service-{}", active_service_id);
+        if let Some(wv) = app.get_webview(&label) {
+            let _ = wv.hide();
+        }
+    }
+    if let Some(wv) = app.get_webview("ai-webview") {
+        let _ = wv.hide();
+    }
+    let _ = app.emit("open-modal", &modal_type);
+}
+
 // ========================================
 // Service commands
 // ========================================
@@ -35,7 +51,10 @@ pub fn add_service(
     };
     s.services.push(new_service);
     store::save_services(&app, &s.services);
-    s.services.clone()
+    let services = s.services.clone();
+    drop(s);
+    let _ = app.emit("service-list-updated", ());
+    services
 }
 
 #[tauri::command]
@@ -46,17 +65,19 @@ pub fn remove_service(
 ) -> Vec<Service> {
     let label = format!("service-{}", service_id);
 
-    // Close the webview window
-    if let Some(ww) = app.get_webview_window(&label) {
-        let _ = ww.close();
+    // Close the webview
+    if let Some(wv) = app.get_webview(&label) {
+        let _ = wv.close();
     }
 
     let mut s = state.lock().unwrap();
     s.services.retain(|svc| svc.id != service_id);
     s.created_webview_labels.retain(|l| l != &label);
-
     store::save_services(&app, &s.services);
-    s.services.clone()
+    let services = s.services.clone();
+    drop(s);
+    let _ = app.emit("service-list-updated", ());
+    services
 }
 
 #[tauri::command]
@@ -98,7 +119,10 @@ pub fn reorder_services(
 
     s.services = services;
     store::save_services(&app, &s.services);
-    s.services.clone()
+    let result = s.services.clone();
+    drop(s);
+    let _ = app.emit("service-list-updated", ());
+    result
 }
 
 #[tauri::command]
@@ -146,7 +170,11 @@ pub fn set_active_ai_service(
     service_id: String,
 ) -> Option<AiService> {
     let mut s = state.lock().unwrap();
-    let service = s.ai_services.iter().find(|svc| svc.id == service_id).cloned();
+    let service = s
+        .ai_services
+        .iter()
+        .find(|svc| svc.id == service_id)
+        .cloned();
     if service.is_some() {
         s.active_ai_service_id = service_id.clone();
         store::save_value(&app, "activeAiServiceId", &service_id);
@@ -184,7 +212,7 @@ pub fn remove_ai_service(
         .ai_services
         .iter()
         .find(|svc| svc.id == service_id)
-        .map_or(false, |svc| svc.is_default);
+        .is_some_and(|svc| svc.is_default);
 
     if is_default {
         return s.ai_services.clone();
@@ -214,11 +242,7 @@ pub fn get_show_ai_companion(state: State<Mutex<AppState>>) -> bool {
 }
 
 #[tauri::command]
-pub fn set_show_ai_companion(
-    app: AppHandle,
-    state: State<Mutex<AppState>>,
-    show: bool,
-) -> bool {
+pub fn set_show_ai_companion(app: AppHandle, state: State<Mutex<AppState>>, show: bool) -> bool {
     let mut s = state.lock().unwrap();
     s.show_ai_companion = show;
     store::save_value(&app, "showAiCompanion", &show);
@@ -232,13 +256,9 @@ pub fn get_ai_width(state: State<Mutex<AppState>>) -> u32 {
 }
 
 #[tauri::command]
-pub fn set_ai_width(
-    app: AppHandle,
-    state: State<Mutex<AppState>>,
-    width: u32,
-) -> u32 {
+pub fn set_ai_width(app: AppHandle, state: State<Mutex<AppState>>, width: u32) -> u32 {
     let mut s = state.lock().unwrap();
-    let valid_width = width.max(300).min(800);
+    let valid_width = width.clamp(300, 800);
     s.ai_width = valid_width;
     store::save_value(&app, "aiWidth", &valid_width);
     valid_width
@@ -307,9 +327,9 @@ pub async fn create_service_webview(
 ) -> Result<(), String> {
     let label = format!("service-{}", service_id);
 
-    if let Some(ww) = app.get_webview_window(&label) {
+    if let Some(wv) = app.get_webview(&label) {
         if let Ok(parsed_url) = url.parse::<url::Url>() {
-            let _ = ww.navigate(parsed_url);
+            let _ = wv.navigate(parsed_url);
         }
         let state = app.state::<Mutex<AppState>>();
         let mut s = state.lock().unwrap();
@@ -319,26 +339,26 @@ pub async fn create_service_webview(
         return Ok(());
     }
 
-    let layout = {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let app_clone = app.clone();
+    let label_clone = label.clone();
+
+    let layout_info = {
         let state = app.state::<Mutex<AppState>>();
         let s = state.lock().unwrap();
-        if let Some(main_ww) = app.get_webview_window("main") {
-            crate::webview_manager::get_layout_params(&main_ww, &s)
+        if let Some(main_win) = app.get_window("main") {
+            crate::webview_manager::get_layout_params(&main_win, &s)
         } else {
             None
         }
     };
 
-    if let Some(l) = layout {
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        let app_clone = app.clone();
-        let label_clone = label.clone();
-        
+    if let Some(l) = layout_info {
         app.run_on_main_thread(move || {
-            let res = if let Some(main_ww) = app_clone.get_webview_window("main") {
-                match crate::webview_manager::create_service_webview_window(
+            let res = if let Some(main_win) = app_clone.get_window("main") {
+                match crate::webview_manager::create_service_webview(
                     &app_clone,
-                    &main_ww,
+                    &main_win,
                     &label_clone,
                     &url,
                     &l,
@@ -350,19 +370,20 @@ pub async fn create_service_webview(
                 Err("Main window not found".into())
             };
             let _ = tx.send(res);
-        }).map_err(|e| e.to_string())?;
-        
+        })
+        .map_err(|e| e.to_string())?;
+
         rx.await.map_err(|e| e.to_string())??;
-        
-        let state = app.state::<Mutex<AppState>>();
-        let mut s = state.lock().unwrap();
-        if !s.created_webview_labels.contains(&label) {
-            s.created_webview_labels.push(label);
-        }
-        Ok(())
     } else {
-        Err("Failed to compute layout".into())
+        return Err("Failed to compute layout".into());
     }
+
+    let state = app.state::<Mutex<AppState>>();
+    let mut s = state.lock().unwrap();
+    if !s.created_webview_labels.contains(&label) {
+        s.created_webview_labels.push(label);
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -389,15 +410,18 @@ pub fn create_all_service_webviews(
     let mut registered_labels: Vec<String> = Vec::new();
     for service_id in &services_to_register {
         let label = format!("service-{}", service_id);
-        if app.get_webview_window(&label).is_some() {
+        if app.get_webview(&label).is_some() {
             registered_labels.push(label);
         } else {
-            println!("[create_all_service_webviews] Window {} not found (not created in setup)", label);
+            println!(
+                "[create_all_service_webviews] Webview {} not found (not created in setup)",
+                label
+            );
         }
     }
 
     // Register AI webview
-    if app.get_webview_window("ai-webview").is_some() {
+    if app.get_webview("ai-webview").is_some() {
         let mut s = state.lock().unwrap();
         s.ai_webview_created = true;
     }
@@ -416,13 +440,57 @@ pub fn create_all_service_webviews(
 }
 
 #[tauri::command]
-pub fn switch_service_webview(
+pub async fn switch_service_webview(
     app: AppHandle,
-    state: State<Mutex<AppState>>,
+    state: State<'_, Mutex<AppState>>,
     service_id: String,
 ) -> Result<(), String> {
-    let s = state.lock().unwrap();
-    webview_manager::switch_service(&app, &service_id, &s);
+    println!("[commands] switch_service_webview: {}", service_id);
+    let label = format!("service-{}", service_id);
+
+    // Lazy creation: create WebView if it doesn't exist yet
+    if app.get_webview(&label).is_none() {
+        let url_opt = {
+            let s = state.lock().unwrap();
+            s.services
+                .iter()
+                .find(|svc| svc.id == service_id)
+                .map(|svc| svc.url.clone())
+        };
+        if let Some(url) = url_opt {
+            let layout_info = {
+                let s = state.lock().unwrap();
+                if let Some(main_win) = app.get_window("main") {
+                    webview_manager::get_layout_params(&main_win, &s)
+                } else {
+                    None
+                }
+            };
+            if let Some(l) = layout_info {
+                let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), String>>();
+                let app2 = app.clone();
+                let label2 = label.clone();
+                app.run_on_main_thread(move || {
+                    let res = if let Some(mw) = app2.get_window("main") {
+                        webview_manager::create_service_webview(&app2, &mw, &label2, &url, &l)
+                            .map(|_| ())
+                    } else {
+                        Err("no main window".into())
+                    };
+                    let _ = tx.send(res);
+                })
+                .map_err(|e| e.to_string())?;
+                rx.await.map_err(|e| e.to_string())??;
+                let mut s = state.lock().unwrap();
+                if !s.created_webview_labels.contains(&label) {
+                    s.created_webview_labels.push(label);
+                }
+            }
+        }
+    }
+
+    let snapshot = state.lock().unwrap().clone();
+    webview_manager::switch_service(&app, &service_id, &snapshot);
     Ok(())
 }
 
@@ -434,8 +502,8 @@ pub fn remove_service_webview(
 ) -> Result<(), String> {
     let label = format!("service-{}", service_id);
 
-    if let Some(ww) = app.get_webview_window(&label) {
-        let _ = ww.close();
+    if let Some(wv) = app.get_webview(&label) {
+        let _ = wv.close();
     }
 
     let mut s = state.lock().unwrap();
@@ -445,50 +513,46 @@ pub fn remove_service_webview(
 
 #[tauri::command]
 pub fn hide_all_child_webviews(app: AppHandle, state: State<Mutex<AppState>>) {
-    let s = state.lock().unwrap();
-    
-    // 現在アクティブなサービスのWebviewを隠す
-    if !s.active_service_id.is_empty() {
-        let label = format!("service-{}", s.active_service_id);
-        if let Some(ww) = app.get_webview_window(&label) {
-            let _ = ww.hide();
+    let active_service_id = state.lock().unwrap().active_service_id.clone();
+
+    if !active_service_id.is_empty() {
+        let label = format!("service-{}", active_service_id);
+        if let Some(wv) = app.get_webview(&label) {
+            let _ = wv.hide();
         }
     }
-    
-    // AIコンパニオンを隠す
-    if let Some(ww) = app.get_webview_window("ai-webview") {
-        let _ = ww.hide();
+
+    if let Some(wv) = app.get_webview("ai-webview") {
+        let _ = wv.hide();
     }
 }
 
 #[tauri::command]
 pub fn restore_child_webviews(app: AppHandle, state: State<Mutex<AppState>>) {
-    let s = state.lock().unwrap();
-    
-    // アクティブなサービスが選択されていれば再表示
-    if !s.active_service_id.is_empty() {
-        let label = format!("service-{}", s.active_service_id);
-        if let Some(ww) = app.get_webview_window(&label) {
-            let _ = ww.show();
+    let (active_service_id, show_ai_companion) = {
+        let s = state.lock().unwrap();
+        (s.active_service_id.clone(), s.show_ai_companion)
+    };
+
+    if !active_service_id.is_empty() {
+        let label = format!("service-{}", active_service_id);
+        if let Some(wv) = app.get_webview(&label) {
+            let _ = wv.show();
         }
     }
-    
-    // AIコンパニオンが有効なら再表示
-    if s.show_ai_companion {
-        if let Some(ww) = app.get_webview_window("ai-webview") {
-            let _ = ww.show();
+
+    if show_ai_companion {
+        if let Some(wv) = app.get_webview("ai-webview") {
+            let _ = wv.show();
         }
     }
 }
 
 #[tauri::command]
-pub async fn create_ai_webview(
-    app: AppHandle,
-    url: String,
-) -> Result<(), String> {
-    if let Some(ww) = app.get_webview_window("ai-webview") {
+pub async fn create_ai_webview(app: AppHandle, url: String) -> Result<(), String> {
+    if let Some(wv) = app.get_webview("ai-webview") {
         if let Ok(parsed_url) = url.parse::<url::Url>() {
-            let _ = ww.navigate(parsed_url);
+            let _ = wv.navigate(parsed_url);
         }
         let state = app.state::<Mutex<AppState>>();
         let mut s = state.lock().unwrap();
@@ -496,28 +560,23 @@ pub async fn create_ai_webview(
         return Ok(());
     }
 
-    let layout = {
+    let layout_info = {
         let state = app.state::<Mutex<AppState>>();
         let s = state.lock().unwrap();
-        if let Some(main_ww) = app.get_webview_window("main") {
-            crate::webview_manager::get_layout_params(&main_ww, &s)
+        if let Some(main_win) = app.get_window("main") {
+            crate::webview_manager::get_layout_params(&main_win, &s)
         } else {
             None
         }
     };
 
-    if let Some(l) = layout {
+    if let Some(l) = layout_info {
         let (tx, rx) = tokio::sync::oneshot::channel();
         let app_clone = app.clone();
-        
+
         app.run_on_main_thread(move || {
-            let res = if let Some(main_ww) = app_clone.get_webview_window("main") {
-                match crate::webview_manager::create_ai_webview_window(
-                    &app_clone,
-                    &main_ww,
-                    &url,
-                    &l,
-                ) {
+            let res = if let Some(main_win) = app_clone.get_window("main") {
+                match crate::webview_manager::create_ai_webview(&app_clone, &main_win, &url, &l) {
                     Ok(_) => Ok(()),
                     Err(e) => Err(e),
                 }
@@ -525,10 +584,11 @@ pub async fn create_ai_webview(
                 Err("Main window not found".into())
             };
             let _ = tx.send(res);
-        }).map_err(|e| e.to_string())?;
-        
+        })
+        .map_err(|e| e.to_string())?;
+
         rx.await.map_err(|e| e.to_string())??;
-        
+
         let state = app.state::<Mutex<AppState>>();
         let mut s = state.lock().unwrap();
         s.ai_webview_created = true;
@@ -539,50 +599,55 @@ pub async fn create_ai_webview(
 }
 
 #[tauri::command]
-pub async fn setup_ai_webview(
-    app: AppHandle,
-    url: String,
-    _width: u32,
-) -> Result<(), String> {
+pub async fn setup_ai_webview(app: AppHandle, url: String, _width: u32) -> Result<(), String> {
     create_ai_webview(app, url).await
 }
 
 #[tauri::command]
-pub fn toggle_ai_webview(
+pub async fn toggle_ai_webview(
     app: AppHandle,
-    state: State<Mutex<AppState>>,
+    state: State<'_, Mutex<AppState>>,
 ) -> Result<bool, String> {
-    let mut s = state.lock().unwrap();
-    s.show_ai_companion = !s.show_ai_companion;
-    let show = s.show_ai_companion;
+    let show = {
+        let mut s = state.lock().unwrap();
+        s.show_ai_companion = !s.show_ai_companion;
+        s.show_ai_companion
+    };
     store::save_value(&app, "showAiCompanion", &show);
 
-    webview_manager::update_layout(&app, &s);
+    println!("[commands] toggle_ai_webview: show={}", show);
+    let snapshot = state.lock().unwrap().clone();
+    webview_manager::update_layout(&app, &snapshot);
+
     Ok(show)
 }
 
 #[tauri::command]
-pub fn resize_ai_webview(
+pub async fn resize_ai_webview(
     app: AppHandle,
-    state: State<Mutex<AppState>>,
+    state: State<'_, Mutex<AppState>>,
     width: u32,
 ) -> Result<(), String> {
-    let mut s = state.lock().unwrap();
-    let valid_width = width.max(300).min(800);
-    s.ai_width = valid_width;
+    let valid_width = width.clamp(300, 800);
+    {
+        let mut s = state.lock().unwrap();
+        s.ai_width = valid_width;
+    }
     store::save_value(&app, "aiWidth", &valid_width);
 
-    webview_manager::update_layout(&app, &s);
+    let snapshot = state.lock().unwrap().clone();
+    webview_manager::update_layout(&app, &snapshot);
+
     Ok(())
 }
 
 #[tauri::command]
-pub fn update_layout(
+pub async fn update_layout(
     app: AppHandle,
-    state: State<Mutex<AppState>>,
+    state: State<'_, Mutex<AppState>>,
 ) -> Result<(), String> {
-    let s = state.lock().unwrap();
-    webview_manager::update_layout(&app, &s);
+    let snapshot = state.lock().unwrap().clone();
+    webview_manager::update_layout(&app, &snapshot);
     Ok(())
 }
 
@@ -592,16 +657,27 @@ pub fn switch_ai_service(
     state: State<Mutex<AppState>>,
     service_id: String,
 ) -> Result<Option<AiService>, String> {
-    let mut s = state.lock().unwrap();
-    let service = s.ai_services.iter().find(|svc| svc.id == service_id).cloned();
+    let service = {
+        let mut s = state.lock().unwrap();
+        let found = s
+            .ai_services
+            .iter()
+            .find(|svc| svc.id == service_id)
+            .cloned();
+        if found.is_some() {
+            s.active_ai_service_id = service_id.clone();
+        }
+        found
+    };
 
     if let Some(ref svc) = service {
-        s.active_ai_service_id = service_id.clone();
         store::save_value(&app, "activeAiServiceId", &service_id);
-
-        if let Some(ai_ww) = app.get_webview_window("ai-webview") {
-            let url: url::Url = svc.url.parse().map_err(|e: url::ParseError| e.to_string())?;
-            let _ = ai_ww.navigate(url);
+        if let Some(ai_wv) = app.get_webview("ai-webview") {
+            let url: url::Url = svc
+                .url
+                .parse()
+                .map_err(|e: url::ParseError| e.to_string())?;
+            let _ = ai_wv.navigate(url);
         }
     }
 
@@ -610,7 +686,7 @@ pub fn switch_ai_service(
 
 #[tauri::command]
 pub fn send_to_ai_webview(app: AppHandle, text: String) -> Result<(), String> {
-    if let Some(ai_ww) = app.get_webview_window("ai-webview") {
+    if let Some(ai_wv) = app.get_webview("ai-webview") {
         let js = format!(
             r#"(function() {{
                 const textareas = document.querySelectorAll('textarea, [contenteditable="true"], .ql-editor, [role="textbox"]');
@@ -633,7 +709,7 @@ pub fn send_to_ai_webview(app: AppHandle, text: String) -> Result<(), String> {
             serde_json::to_string(&text).unwrap_or_default(),
             serde_json::to_string(&text).unwrap_or_default(),
         );
-        ai_ww.eval(&js).map_err(|e| e.to_string())?;
+        ai_wv.eval(&js).map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -661,7 +737,6 @@ pub fn open_popup_window_internal(
     // 既存のポップアップウィンドウがあれば閉じる
     if let Some(existing) = app.get_webview_window("popup-auth") {
         let _ = existing.close();
-        std::thread::sleep(std::time::Duration::from_millis(200));
     }
 
     let app_for_nav = app.clone();
@@ -676,7 +751,7 @@ pub fn open_popup_window_internal(
     .center()
     .decorations(true)
     .user_agent(crate::webview_manager::chrome_user_agent())
-    .initialization_script(&crate::webview_manager::browser_spoof_script())
+    .initialization_script(crate::webview_manager::browser_spoof_script())
     .on_navigation(move |nav_url| {
         let url_str = nav_url.as_str();
         println!("[popup-auth] navigating to: {}", url_str);
@@ -704,15 +779,15 @@ pub fn open_popup_window_internal(
             let owned_url = url_str.to_string();
             let app2 = app_for_nav.clone();
             let pop_source_label = source_label.clone();
-            
+
             std::thread::spawn(move || {
                 // 呼び出し元のWebViewがあればそこにナビゲート
                 if let Some(label) = pop_source_label {
-                    if let Some(ww) = app2.get_webview_window(&label) {
+                    if let Some(wv) = app2.get_webview(&label) {
                         if let Ok(u) = owned_url.parse::<url::Url>() {
-                            let _ = ww.navigate(u);
+                            let _ = wv.navigate(u);
                         }
-                        let _ = ww.show();
+                        let _ = wv.show();
                     }
                 } else {
                     // sourceが無い場合は従来通りSlackを探す
@@ -725,11 +800,11 @@ pub fn open_popup_window_internal(
                             .map(|svc| format!("service-{}", svc.id))
                     };
                     if let Some(label) = slack_label {
-                        if let Some(slack_ww) = app2.get_webview_window(&label) {
+                        if let Some(slack_wv) = app2.get_webview(&label) {
                             if let Ok(u) = owned_url.parse::<url::Url>() {
-                                let _ = slack_ww.navigate(u);
+                                let _ = slack_wv.navigate(u);
                             }
-                            let _ = slack_ww.show();
+                            let _ = slack_wv.show();
                         }
                     }
                 }
@@ -775,10 +850,13 @@ pub fn update_notification_count(
     let mut s = state.lock().unwrap();
     s.badge_counts.insert(service_id.clone(), count);
 
-    let _ = app.emit("badge-updated", serde_json::json!({
-        "serviceId": service_id,
-        "count": count
-    }));
+    let _ = app.emit(
+        "badge-updated",
+        serde_json::json!({
+            "serviceId": service_id,
+            "count": count
+        }),
+    );
 
     Ok(())
 }
@@ -800,10 +878,13 @@ pub fn update_favicon(
     }
     store::save_services(&app, &s.services);
 
-    let _ = app.emit("favicon-updated", serde_json::json!({
-        "serviceId": service_id,
-        "faviconUrl": favicon_url
-    }));
+    let _ = app.emit(
+        "favicon-updated",
+        serde_json::json!({
+            "serviceId": service_id,
+            "faviconUrl": favicon_url
+        }),
+    );
 
     Ok(())
 }

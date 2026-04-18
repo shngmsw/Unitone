@@ -56,6 +56,7 @@ pub fn get_notification_script(service_id: &str) -> String {
 
 /// Fallback: poll document.title from Rust side for external webviews
 /// where Tauri IPC may not be available.
+#[allow(dead_code)]
 pub fn start_title_polling(app_handle: tauri::AppHandle) {
     let _title_cache: StdMutex<HashMap<String, u32>> = StdMutex::new(HashMap::new());
     let _favicon_sent: StdMutex<HashMap<String, String>> = StdMutex::new(HashMap::new());
@@ -71,11 +72,11 @@ pub fn start_title_polling(app_handle: tauri::AppHandle) {
         };
 
         for label in &labels {
-            if let Some(ww) = app_handle.get_webview_window(label) {
-                let service_id = label.strip_prefix("service-").unwrap_or(label);
+            if let Some(wv) = app_handle.get_webview(label) {
+                let service_id = label.strip_prefix("service-").unwrap_or(label).to_string();
 
                 // Notification count polling via eval
-                let _ = ww.eval(&format!(
+                let _ = wv.eval(format!(
                     r#"(function() {{
                         const patterns = [/\((\d+)\)/, /\[(\d+)\]/, /(\d+)\s*new/, /(\d+)\s*unread/];
                         const title = document.title || '';
@@ -95,32 +96,57 @@ pub fn start_title_polling(app_handle: tauri::AppHandle) {
                 ));
 
                 // Favicon: derive from service URL using Google's favicon service
-                {
+                let (should_emit, favicon_url) = {
                     let state = app_handle.state::<std::sync::Mutex<crate::state::AppState>>();
                     let s = state.lock().unwrap();
-                    if let Some(svc) = s.services.iter().find(|svc| format!("service-{}", svc.id) == *label) {
+                    if let Some(svc) = s
+                        .services
+                        .iter()
+                        .find(|svc| format!("service-{}", svc.id) == *label)
+                    {
                         if svc.favicon_url.is_none() {
                             if let Ok(parsed) = svc.url.parse::<url::Url>() {
                                 if let Some(domain) = parsed.host_str() {
-                                    let favicon_url = format!(
+                                    let url = format!(
                                         "https://www.google.com/s2/favicons?domain={}&sz=32",
                                         domain
                                     );
-                                    drop(s);
-                                    let _ = app_handle.emit("favicon-updated", serde_json::json!({
-                                        "serviceId": service_id,
-                                        "faviconUrl": favicon_url
-                                    }));
-                                    // Save it
-                                    let state2 = app_handle.state::<std::sync::Mutex<crate::state::AppState>>();
-                                    let mut s2 = state2.lock().unwrap();
-                                    if let Some(svc2) = s2.services.iter_mut().find(|sv| format!("service-{}", sv.id) == *label) {
-                                        svc2.favicon_url = Some(favicon_url);
-                                    }
-                                    crate::store::save_services(&app_handle, &s2.services);
+                                    (true, Some(url))
+                                } else {
+                                    (false, None)
                                 }
+                            } else {
+                                (false, None)
                             }
+                        } else {
+                            (false, None)
                         }
+                    } else {
+                        (false, None)
+                    }
+                };
+
+                if should_emit {
+                    if let Some(f_url) = favicon_url {
+                        let _ = app_handle.emit(
+                            "favicon-updated",
+                            serde_json::json!({
+                                "serviceId": service_id,
+                                "faviconUrl": f_url
+                            }),
+                        );
+
+                        // Save it back into state
+                        let state = app_handle.state::<std::sync::Mutex<crate::state::AppState>>();
+                        let mut s = state.lock().unwrap();
+                        if let Some(svc) = s
+                            .services
+                            .iter_mut()
+                            .find(|sv| format!("service-{}", sv.id) == *label)
+                        {
+                            svc.favicon_url = Some(f_url);
+                        }
+                        crate::store::save_services(&app_handle, &s.services);
                     }
                 }
             }
@@ -178,7 +204,9 @@ fn extract_number_before(text: &str, keyword: &str) -> Option<u32> {
     let lower = text.to_lowercase();
     if let Some(pos) = lower.find(keyword) {
         let before = text[..pos].trim_end();
-        let num_start = before.rfind(|c: char| !c.is_ascii_digit()).map_or(0, |p| p + 1);
+        let num_start = before
+            .rfind(|c: char| !c.is_ascii_digit())
+            .map_or(0, |p| p + 1);
         let num_str = &before[num_start..];
         return num_str.parse().ok();
     }

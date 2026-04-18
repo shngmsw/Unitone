@@ -50,7 +50,7 @@ export class AiCompanionManager {
 
     const isHidden = aiCompanion.classList.toggle('hidden');
 
-    // Rust側でトグル＆レイアウト更新
+    // Rust側でトグル＆レイアウト更新 (toggle_ai_webview 内で済んでいる)
     await invoke('toggle_ai_webview');
 
     if (!isHidden && this.hitotone.activeAiService) {
@@ -63,9 +63,6 @@ export class AiCompanionManager {
         // Already created
       }
     }
-
-    // レイアウト更新
-    await invoke('update_layout');
   }
 
   updateSelectorDisplay() {

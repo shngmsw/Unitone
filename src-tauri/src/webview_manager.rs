@@ -3,7 +3,6 @@ use tauri::Manager;
 use tauri_plugin_shell::ShellExt;
 
 const DOCK_WIDTH: f64 = 64.0;
-const HEADER_HEIGHT: f64 = 32.0;
 
 /// Chrome-compatible User-Agent strings (platform-specific).
 /// Slack や Google Chat は UA ヘッダだけでなく JS の navigator API でもブラウザを判定する。
@@ -140,6 +139,10 @@ pub fn chrome_user_agent() -> &'static str {
 }
 
 pub struct LayoutParams {
+    pub chrome_x: f64,
+    pub chrome_y: f64,
+    pub chrome_width: f64,
+    pub chrome_height: f64,
     pub service_x: f64,
     pub service_y: f64,
     pub service_width: f64,
@@ -150,40 +153,16 @@ pub struct LayoutParams {
     pub ai_height: f64,
 }
 
-/// Position a child WebviewWindow.
-/// After SetParent on Windows, coordinates are relative to parent's client area.
-/// On other platforms, we need absolute screen coordinates.
-fn position_child(
-    #[allow(unused_variables)] main_ww: &tauri::WebviewWindow,
-    child_ww: &tauri::WebviewWindow,
-    rel_x: f64,
-    rel_y: f64,
-    width: f64,
-    height: f64,
-) {
-    #[cfg(target_os = "windows")]
-    {
-        // SetParent makes coordinates relative to parent's client area
-        let _ = child_ww.set_position(tauri::LogicalPosition::new(rel_x, rel_y));
-        let _ = child_ww.set_size(tauri::LogicalSize::new(width, height));
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        if let Ok(inner_pos) = main_ww.inner_position() {
-            let scale = main_ww.scale_factor().unwrap_or(1.0);
-            let abs_x = inner_pos.x as f64 / scale + rel_x;
-            let abs_y = inner_pos.y as f64 / scale + rel_y;
-            let _ = child_ww.set_position(tauri::LogicalPosition::new(abs_x, abs_y));
-            let _ = child_ww.set_size(tauri::LogicalSize::new(width, height));
-        }
-    }
+/// Position a child Webview.
+fn position_child(child: &tauri::Webview, rel_x: f64, rel_y: f64, width: f64, height: f64) {
+    let _ = child.set_position(tauri::LogicalPosition::new(rel_x, rel_y));
+    let _ = child.set_size(tauri::LogicalSize::new(width, height));
 }
 
 /// Calculate service and AI layout areas within the main window's client area.
-pub fn get_layout_params(main_ww: &tauri::WebviewWindow, state: &AppState) -> Option<LayoutParams> {
-    let window_size = main_ww.inner_size().ok()?;
-    let scale = main_ww.scale_factor().unwrap_or(1.0);
+pub fn get_layout_params(main_window: &tauri::Window, state: &AppState) -> Option<LayoutParams> {
+    let window_size = main_window.inner_size().ok()?;
+    let scale = main_window.scale_factor().unwrap_or(1.0);
     let w = window_size.width as f64 / scale;
     let h = window_size.height as f64 / scale;
     let ai_w = if state.show_ai_companion {
@@ -193,14 +172,18 @@ pub fn get_layout_params(main_ww: &tauri::WebviewWindow, state: &AppState) -> Op
     };
 
     Some(LayoutParams {
+        chrome_x: 0.0,
+        chrome_y: 0.0,
+        chrome_width: DOCK_WIDTH,
+        chrome_height: h,
         service_x: DOCK_WIDTH,
-        service_y: HEADER_HEIGHT,
+        service_y: 0.0,
         service_width: (w - DOCK_WIDTH - ai_w).max(100.0),
-        service_height: (h - HEADER_HEIGHT).max(100.0),
+        service_height: h,
         ai_x: w - state.ai_width as f64,
-        ai_y: HEADER_HEIGHT,
+        ai_y: 0.0,
         ai_width: state.ai_width as f64,
-        ai_height: (h - HEADER_HEIGHT).max(100.0),
+        ai_height: h,
     })
 }
 
@@ -243,8 +226,9 @@ pub fn is_internal_navigation(nav_url: &url::Url, initial_url: &url::Url) -> boo
 
     for suffix in internal_domain_suffixes {
         let is_nav_match = nav_host == suffix || nav_host.ends_with(&format!(".{}", suffix));
-        let is_initial_match = initial_host == suffix || initial_host.ends_with(&format!(".{}", suffix));
-        
+        let is_initial_match =
+            initial_host == suffix || initial_host.ends_with(&format!(".{}", suffix));
+
         if is_nav_match && is_initial_match {
             return true;
         }
@@ -253,90 +237,83 @@ pub fn is_internal_navigation(nav_url: &url::Url, initial_url: &url::Url) -> boo
     false
 }
 
-/// Create a service WebviewWindow dynamically.
-pub fn create_service_webview_window(
+/// Create the chrome (dock) child Webview.
+pub fn create_chrome_webview(
+    main_window: &tauri::Window,
+    layout: &LayoutParams,
+) -> Result<tauri::Webview, String> {
+    let webview_builder =
+        tauri::WebviewBuilder::new("chrome", tauri::WebviewUrl::App("chrome.html".into()));
+    main_window
+        .add_child(
+            webview_builder,
+            tauri::LogicalPosition::new(layout.chrome_x, layout.chrome_y),
+            tauri::LogicalSize::new(layout.chrome_width, layout.chrome_height),
+        )
+        .map_err(|e: tauri::Error| e.to_string())
+}
+
+/// Create a service Webview dynamically.
+pub fn create_service_webview(
     app: &tauri::AppHandle,
-    main_ww: &tauri::WebviewWindow,
+    main_window: &tauri::Window,
     label: &str,
     url: &str,
     layout: &LayoutParams,
-) -> Result<tauri::WebviewWindow, String> {
+) -> Result<tauri::Webview, String> {
     let parsed_url: url::Url = url.parse().map_err(|e: url::ParseError| e.to_string())?;
 
-    // Create hidden, then SetParent, then position with relative coords
-    let ww = tauri::WebviewWindowBuilder::new(
-        app,
-        label,
-        tauri::WebviewUrl::External(parsed_url.clone()),
-    )
-    .title(&format!("Hitotone - {}", label))
-    .inner_size(layout.service_width, layout.service_height)
-    .decorations(false)
-    .skip_taskbar(true)
-    .visible(false)
-    .user_agent(CHROME_USER_AGENT)
-    .initialization_script(&browser_spoof_script())
-    .on_navigation({
-        let app_handle = app.clone();
-        let initial_url = parsed_url.clone();
-        move |nav_url| {
-            println!("[service-nav] {}", nav_url.as_str());
-            // ドメインが異なり、かつ同じサービス内のリダイレクトでもなく、認証用URLでもない場合は既定のブラウザで開く
-            let is_internal = is_internal_navigation(nav_url, &initial_url);
-            let is_auth = is_auth_url(nav_url.as_str());
+    let webview_builder =
+        tauri::WebviewBuilder::new(label, tauri::WebviewUrl::External(parsed_url.clone()))
+            .user_agent(CHROME_USER_AGENT)
+            .initialization_script(browser_spoof_script())
+            .on_navigation({
+                let app_handle = app.clone();
+                let initial_url = parsed_url.clone();
+                move |nav_url| {
+                    println!("[service-nav] {}", nav_url.as_str());
+                    let is_internal = is_internal_navigation(nav_url, &initial_url);
+                    let is_auth = is_auth_url(nav_url.as_str());
 
-            if !is_internal && !is_auth {
-                println!("[service-nav] Opening external link in browser: {}", nav_url.as_str());
-                let _ = app_handle.shell().open(nav_url.as_str(), None);
-                return false; // アプリ内でのナビゲーションをキャンセル
-            }
-            true
-        }
-    })
-    .build()
-    .map_err(|e| e.to_string())?;
+                    if !is_internal && !is_auth {
+                        println!(
+                            "[service-nav] Opening external link in browser: {}",
+                            nav_url.as_str()
+                        );
+                        #[allow(deprecated)]
+                        let _ = app_handle.shell().open(nav_url.as_str(), None);
+                        return false;
+                    }
+                    true
+                }
+            });
 
-    // Apply SetParent on Windows, then position with relative coordinates
-    #[cfg(target_os = "windows")]
-    {
-        set_parent_window(main_ww, &ww);
-        let _ = ww.set_position(tauri::LogicalPosition::new(layout.service_x, layout.service_y));
-    }
+    let webview = main_window
+        .add_child(
+            webview_builder,
+            tauri::LogicalPosition::new(layout.service_x, layout.service_y),
+            tauri::LogicalSize::new(layout.service_width, layout.service_height),
+        )
+        .map_err(|e: tauri::Error| e.to_string())?;
 
-    #[cfg(not(target_os = "windows"))]
-    {
-        if let Ok(inner_pos) = main_ww.inner_position() {
-            let scale = main_ww.scale_factor().unwrap_or(1.0);
-            let abs_x = inner_pos.x as f64 / scale + layout.service_x;
-            let abs_y = inner_pos.y as f64 / scale + layout.service_y;
-            let _ = ww.set_position(tauri::LogicalPosition::new(abs_x, abs_y));
-        }
-    }
-
-    Ok(ww)
+    Ok(webview)
 }
 
-/// Create the AI companion WebviewWindow dynamically.
-pub fn create_ai_webview_window(
+/// Create the AI companion Webview dynamically.
+pub fn create_ai_webview(
     app: &tauri::AppHandle,
-    main_ww: &tauri::WebviewWindow,
+    main_window: &tauri::Window,
     url: &str,
     layout: &LayoutParams,
-) -> Result<tauri::WebviewWindow, String> {
+) -> Result<tauri::Webview, String> {
     let parsed_url: url::Url = url.parse().map_err(|e: url::ParseError| e.to_string())?;
 
-    let ww = tauri::WebviewWindowBuilder::new(
-        app,
+    let webview_builder = tauri::WebviewBuilder::new(
         "ai-webview",
         tauri::WebviewUrl::External(parsed_url.clone()),
     )
-    .title("Hitotone - AI")
-    .inner_size(layout.ai_width, layout.ai_height)
-    .decorations(false)
-    .skip_taskbar(true)
-    .visible(false)
     .user_agent(CHROME_USER_AGENT)
-    .initialization_script(&browser_spoof_script())
+    .initialization_script(browser_spoof_script())
     .on_navigation({
         let app_handle = app.clone();
         let initial_url = parsed_url.clone();
@@ -346,135 +323,130 @@ pub fn create_ai_webview_window(
             let is_auth = is_auth_url(nav_url.as_str());
 
             if !is_internal && !is_auth {
-                println!("[ai-nav] Opening external link in browser: {}", nav_url.as_str());
+                println!(
+                    "[ai-nav] Opening external link in browser: {}",
+                    nav_url.as_str()
+                );
+                #[allow(deprecated)]
                 let _ = app_handle.shell().open(nav_url.as_str(), None);
                 return false;
             }
             true
         }
-    })
-    .build()
-    .map_err(|e| e.to_string())?;
+    });
 
-    #[cfg(target_os = "windows")]
-    {
-        set_parent_window(main_ww, &ww);
-        let _ = ww.set_position(tauri::LogicalPosition::new(layout.ai_x, layout.ai_y));
-    }
+    let webview = main_window
+        .add_child(
+            webview_builder,
+            tauri::LogicalPosition::new(layout.ai_x, layout.ai_y),
+            tauri::LogicalSize::new(layout.ai_width, layout.ai_height),
+        )
+        .map_err(|e: tauri::Error| e.to_string())?;
 
-    #[cfg(not(target_os = "windows"))]
-    {
-        if let Ok(inner_pos) = main_ww.inner_position() {
-            let scale = main_ww.scale_factor().unwrap_or(1.0);
-            let abs_x = inner_pos.x as f64 / scale + layout.ai_x;
-            let abs_y = inner_pos.y as f64 / scale + layout.ai_y;
-            let _ = ww.set_position(tauri::LogicalPosition::new(abs_x, abs_y));
-        }
-    }
-
-    Ok(ww)
-}
-
-/// On Windows, call SetParent to make child window an OS-level child of main.
-/// This makes the child window move together with the main window during drag.
-/// We do NOT change the window style to WS_CHILD to avoid breaking WebView2 input.
-#[cfg(target_os = "windows")]
-fn set_parent_window(main_ww: &tauri::WebviewWindow, child_ww: &tauri::WebviewWindow) {
-    use windows_sys::Win32::UI::WindowsAndMessaging::SetParent;
-
-    let main_hwnd = main_ww.hwnd().unwrap().0 as windows_sys::Win32::Foundation::HWND;
-    let child_hwnd = child_ww.hwnd().unwrap().0 as windows_sys::Win32::Foundation::HWND;
-
-    unsafe {
-        SetParent(child_hwnd, main_hwnd);
-    }
+    Ok(webview)
 }
 
 /// Switch visible service webview: show the active one, hide others.
 pub fn switch_service(app_handle: &tauri::AppHandle, active_service_id: &str, state: &AppState) {
-    let main_ww = match app_handle.get_webview_window("main") {
+    let main_window = match app_handle.get_window("main") {
         Some(w) => w,
         None => return,
     };
 
-    let layout = match get_layout_params(&main_ww, state) {
+    let layout = match get_layout_params(&main_window, state) {
         Some(l) => l,
         None => return,
     };
 
     for label in &state.created_webview_labels {
-        if let Some(child_ww) = app_handle.get_webview_window(label) {
+        if let Some(child) = app_handle.get_webview(label) {
             let service_id = label.strip_prefix("service-").unwrap_or(label);
             if service_id == active_service_id {
                 position_child(
-                    &main_ww,
-                    &child_ww,
+                    &child,
                     layout.service_x,
                     layout.service_y,
                     layout.service_width,
                     layout.service_height,
                 );
-                let _ = child_ww.show();
+                let _ = child.show();
             } else {
-                let _ = child_ww.hide();
+                let _ = child.hide();
             }
         }
     }
 }
 
-/// Update layout of all child webview windows (services + AI).
+/// Update layout of all child webviews (chrome + services + AI).
 pub fn update_layout(app_handle: &tauri::AppHandle, state: &AppState) {
-    let main_ww = match app_handle.get_webview_window("main") {
+    let main_window = match app_handle.get_window("main") {
         Some(w) => w,
         None => return,
     };
 
-    let layout = match get_layout_params(&main_ww, state) {
+    let layout = match get_layout_params(&main_window, state) {
         Some(l) => l,
         None => return,
     };
 
-    // Update service webview windows
+    // Update chrome webview (dock - always visible, resizes with window)
+    if let Some(chrome_wv) = app_handle.get_webview("chrome") {
+        position_child(
+            &chrome_wv,
+            layout.chrome_x,
+            layout.chrome_y,
+            layout.chrome_width,
+            layout.chrome_height,
+        );
+    }
+
+    // Update service webviews
     for label in &state.created_webview_labels {
-        if let Some(child_ww) = app_handle.get_webview_window(label) {
+        if let Some(child) = app_handle.get_webview(label) {
             let service_id = label.strip_prefix("service-").unwrap_or(label);
             if service_id == state.active_service_id {
                 position_child(
-                    &main_ww,
-                    &child_ww,
+                    &child,
                     layout.service_x,
                     layout.service_y,
                     layout.service_width,
                     layout.service_height,
                 );
-                let _ = child_ww.show();
+                // 既に表示されているかどうかの判定は Webview インスタンスからは難しいため、
+                // 少なくとも各更新での呼び出しを最小限にする。
+                let _ = child.show();
             } else {
-                let _ = child_ww.hide();
+                // 非アクティブなものは隠す。
+                // 頻繁な呼び出しを避けるため、ここでは show されているものだけをターゲットにしたいが、
+                // ステート管理が必要。一旦そのまま。
+                let _ = child.hide();
             }
         }
     }
 
-    // Update AI webview window
+    // Update AI webview
     if state.ai_webview_created {
-        if let Some(ai_ww) = app_handle.get_webview_window("ai-webview") {
+        if let Some(ai_wv) = app_handle.get_webview("ai-webview") {
             if state.show_ai_companion {
                 position_child(
-                    &main_ww,
-                    &ai_ww,
+                    &ai_wv,
                     layout.ai_x,
                     layout.ai_y,
                     layout.ai_width,
                     layout.ai_height,
                 );
-                let _ = ai_ww.show();
+                let _ = ai_wv.show();
             } else {
-                let _ = ai_ww.hide();
+                let _ = ai_wv.hide();
             }
         }
     }
 }
 
 /// Called when the main window is resized.
-pub fn on_main_window_resized(app_handle: &tauri::AppHandle, state: &AppState) {
-    update_layout(app_handle, state);
+#[allow(dead_code)]
+pub fn on_main_window_resized(app_handle: &tauri::AppHandle) {
+    let state = app_handle.state::<std::sync::Mutex<AppState>>();
+    let s = state.lock().unwrap();
+    update_layout(app_handle, &s);
 }

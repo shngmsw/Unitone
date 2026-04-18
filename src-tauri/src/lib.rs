@@ -55,32 +55,23 @@ pub fn run() {
             commands::open_popup_window,
             commands::hide_all_child_webviews,
             commands::restore_child_webviews,
+            commands::request_open_modal,
         ])
         .on_window_event(|window, event| {
             let app_handle = window.app_handle();
 
-            match event {
-                tauri::WindowEvent::CloseRequested { .. } => {
-                    if window.label() == "main" {
-                        if let Some(ww) = app_handle.get_webview_window("main") {
-                            if let Ok(size) = ww.inner_size() {
-                                let state = app_handle.state::<Mutex<AppState>>();
-                                let mut s = state.lock().unwrap();
-                                s.window_bounds.width = size.width;
-                                s.window_bounds.height = size.height;
-                                store::save_state(app_handle, &s);
-                            }
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                if window.label() == "main" {
+                    if let Some(ww) = app_handle.get_webview_window("main") {
+                        if let Ok(size) = ww.inner_size() {
+                            let state = app_handle.state::<Mutex<AppState>>();
+                            let mut s = state.lock().unwrap();
+                            s.window_bounds.width = size.width;
+                            s.window_bounds.height = size.height;
+                            store::save_state(app_handle, &s);
                         }
                     }
                 }
-                tauri::WindowEvent::Resized(_) => {
-                    if window.label() == "main" {
-                        let state = app_handle.state::<Mutex<AppState>>();
-                        let s = state.lock().unwrap();
-                        webview_manager::on_main_window_resized(app_handle, &s);
-                    }
-                }
-                _ => {}
             }
         })
         .setup(|app| {
@@ -94,7 +85,7 @@ pub fn run() {
             // This avoids the deadlock that occurs when creating windows from command threads
             {
                 // Collect service info first, then release the lock
-                let (services_info, active_service_id, ai_url, show_ai) = {
+                let (services_info, active_service_id) = {
                     let state = app.state::<Mutex<AppState>>();
                     let s = state.lock().unwrap();
                     let services: Vec<(String, String)> = s
@@ -104,82 +95,58 @@ pub fn run() {
                         .map(|svc| (svc.id.clone(), svc.url.clone()))
                         .collect();
                     let active = s.active_service_id.clone();
-                    let ai_url = s
-                        .ai_services
-                        .iter()
-                        .find(|svc| svc.id == s.active_ai_service_id)
-                        .or_else(|| s.ai_services.first())
-                        .map(|svc| svc.url.clone());
-                    let show_ai = s.show_ai_companion;
-                    (services, active, ai_url, show_ai)
+                    (services, active)
                 };
                 // Lock released
 
-                let main_ww = app.get_webview_window("main");
+                let main_win = app.get_window("main");
 
-                if let Some(ref main_ww) = main_ww {
+                if let Some(ref main_win) = main_win {
                     let layout = {
                         let state = app.state::<Mutex<AppState>>();
                         let s = state.lock().unwrap();
-                        webview_manager::get_layout_params(main_ww, &s)
+                        webview_manager::get_layout_params(main_win, &s)
                     };
 
                     if let Some(layout) = layout {
                         let mut created_labels: Vec<String> = Vec::new();
 
-                        // Create service webview windows
-                        for (service_id, url) in &services_info {
-                            let label = format!("service-{}", service_id);
-                            println!("[setup] Creating service webview: {}", label);
+                        // Create chrome (dock) webview first — always visible
+                        println!("[setup] Creating chrome webview");
+                        match webview_manager::create_chrome_webview(main_win, &layout) {
+                            Ok(_) => println!("[setup] Created chrome webview OK"),
+                            Err(e) => println!("[setup] Failed to create chrome webview: {}", e),
+                        }
 
-                            match webview_manager::create_service_webview_window(
+                        // Create ONLY the active service webview.
+                        // Other services are created lazily on first switch.
+                        if let Some((service_id, url)) = services_info
+                            .iter()
+                            .find(|(id, _)| *id == active_service_id)
+                            .or_else(|| services_info.first())
+                        {
+                            let label = format!("service-{}", service_id);
+                            println!("[setup] Creating active service webview: {}", label);
+                            match webview_manager::create_service_webview(
                                 app.handle(),
-                                main_ww,
+                                main_win,
                                 &label,
                                 url,
                                 &layout,
                             ) {
-                                Ok(ww) => {
-                                    if *service_id != active_service_id {
-                                        let _ = ww.hide();
-                                    } else {
-                                        let _ = ww.show();
-                                    }
+                                Ok(wv) => {
+                                    let _ = wv.show();
                                     created_labels.push(label);
-                                    println!("[setup] Created service webview OK");
+                                    println!("[setup] Created active service webview OK");
                                 }
-                                Err(e) => {
-                                    println!("[setup] Failed to create {}: {}", label, e);
-                                }
+                                Err(e) => println!(
+                                    "[setup] Failed to create active service webview: {}",
+                                    e
+                                ),
                             }
                         }
 
-                        // Create AI webview window
-                        if let Some(url) = &ai_url {
-                            println!("[setup] Creating AI webview");
-                            match webview_manager::create_ai_webview_window(
-                                app.handle(),
-                                main_ww,
-                                url,
-                                &layout,
-                            ) {
-                                Ok(ai_ww) => {
-                                    if !show_ai {
-                                        let _ = ai_ww.hide();
-                                    } else {
-                                        let _ = ai_ww.show();
-                                    }
-                                    println!("[setup] Created AI webview OK");
-
-                                    let state = app.state::<Mutex<AppState>>();
-                                    let mut s = state.lock().unwrap();
-                                    s.ai_webview_created = true;
-                                }
-                                Err(e) => {
-                                    println!("[setup] Failed to create AI webview: {}", e);
-                                }
-                            }
-                        }
+                        // AI webview is created lazily via setup_ai_webview command.
 
                         // Update state with created labels
                         {
@@ -202,10 +169,10 @@ pub fn run() {
             }
 
             // Start notification polling for external webviews
-            let app_handle = app.handle().clone();
-            std::thread::spawn(move || {
-                notification::start_title_polling(app_handle);
-            });
+            // let app_handle = app.handle().clone();
+            // std::thread::spawn(move || {
+            //     notification::start_title_polling(app_handle);
+            // });
 
             Ok(())
         })
