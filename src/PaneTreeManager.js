@@ -215,6 +215,7 @@ export class PaneTreeManager {
         document.body.classList.add('resizing-active');
         document.body.style.cursor = isH ? 'ew-resize' : 'ns-resize';
         document.body.style.userSelect = 'none';
+        invoke('hide_all_child_webviews').catch(console.error);
       });
     });
   }
@@ -335,6 +336,7 @@ export class PaneTreeManager {
     document.body.classList.remove('resizing-active');
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
+    invoke('restore_child_webviews').catch(console.error);
   }
 
   _computeNewSizes(startSizes, divIndex, delta, totalSize) {

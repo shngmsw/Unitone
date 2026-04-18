@@ -191,9 +191,12 @@ export class AiCompanionManager {
         document.body.style.userSelect = '';
 
         const currentWidth = aiCompanion.offsetWidth;
-        invoke('resize_ai_webview', { width: currentWidth }).catch((err) => {
-          console.warn('AI幅の保存に失敗しました:', err);
-        });
+        invoke('resize_ai_webview', { width: currentWidth })
+          .then(() => invoke('restore_child_webviews'))
+          .catch((err) => {
+            console.warn('AI幅の保存に失敗しました:', err);
+            invoke('restore_child_webviews').catch(console.error);
+          });
       }
     };
 
@@ -210,6 +213,8 @@ export class AiCompanionManager {
       document.body.style.cursor = 'ew-resize';
       document.body.style.userSelect = 'none';
       e.preventDefault();
+      // Hide service webviews so they don't capture mousemove during drag
+      invoke('hide_all_child_webviews').catch(console.error);
     });
 
     document.addEventListener('mousemove', onMouseMove);
