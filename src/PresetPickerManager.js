@@ -2,10 +2,12 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
 const PRESETS = [
-  { id: 'single',      label: '▣',  title: '1ペイン' },
-  { id: 'two_h',       label: '◫',  title: '2分割（横）' },
-  { id: 'two_v',       label: '⬒',  title: '2分割（縦）' },
-  { id: 'two_by_two',  label: '⊞',  title: '4分割' },
+  { id: 'single',      label: '▣', title: '1ペイン' },
+  { id: 'two_h',       label: '◫', title: '2列' },
+  { id: 'two_v',       label: '⬒', title: '2段' },
+  { id: 'two_by_two',  label: '⊞', title: '4分割' },
+  { id: 'three_h',     label: '⦿', title: '3列' },
+  { id: 'four_h',      label: '⁞', title: '4列' },
 ];
 
 export class PresetPickerManager {
@@ -58,11 +60,16 @@ export class PresetPickerManager {
     if (tree.Leaf !== undefined) return 'single';
     if (tree.Split !== undefined) {
       const { direction, children } = tree.Split;
-      if (children.length === 2) {
-        const bothSplit = children.every(c => c.Split !== undefined);
-        if (bothSplit && direction === 'Horizontal') return 'two_by_two';
-        return direction === 'Horizontal' ? 'two_h' : 'two_v';
+      if (direction === 'Horizontal') {
+        if (children.length === 2) {
+          const bothSplit = children.every(c => c.Split !== undefined);
+          if (bothSplit) return 'two_by_two';
+          return 'two_h';
+        }
+        if (children.length === 3) return 'three_h';
+        if (children.length === 4) return 'four_h';
       }
+      if (direction === 'Vertical' && children.length === 2) return 'two_v';
     }
     return 'single';
   }

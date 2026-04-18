@@ -11,6 +11,7 @@ export class PaneTreeManager {
     this.focusedPaneId = null;
     this._dragState = null;
     this._animFrameId = null;
+    this._badgeCounts = {};
 
     document.addEventListener('mousemove', this._onDragMove.bind(this));
     document.addEventListener('mouseup', this._onDragEnd.bind(this));
@@ -50,6 +51,7 @@ export class PaneTreeManager {
       this.container.appendChild(el);
     }
     this._bindEvents();
+    this._restoreBadges();
   }
 
   _buildNode(node, pathToNode) {
@@ -84,7 +86,11 @@ export class PaneTreeManager {
     arrowSpan.className = 'pane-dropdown-arrow';
     arrowSpan.textContent = '▾';
 
+    const badge = document.createElement('span');
+    badge.className = 'pane-badge hidden';
+
     dropdownBtn.appendChild(nameSpan);
+    dropdownBtn.appendChild(badge);
     dropdownBtn.appendChild(arrowSpan);
     header.appendChild(dropdownBtn);
 
@@ -347,6 +353,34 @@ export class PaneTreeManager {
     const child = node.Split.children[idx];
     if (!child) return null;
     return this._getSplitNode(child, rest);
+  }
+
+  updateBadge(serviceId, count) {
+    this._badgeCounts[serviceId] = count;
+    const paneEl = this.container?.querySelector(`.pane[data-service-id="${serviceId}"]`);
+    if (paneEl) {
+      this._applyBadge(paneEl, serviceId);
+    }
+  }
+
+  _applyBadge(paneEl, serviceId) {
+    const count = this._badgeCounts[serviceId] || 0;
+    const badge = paneEl.querySelector('.pane-badge');
+    if (!badge) return;
+    if (count > 0) {
+      badge.textContent = count > 99 ? '99+' : String(count);
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  }
+
+  _restoreBadges() {
+    if (!this.container) return;
+    this.container.querySelectorAll('.pane[data-service-id]').forEach(paneEl => {
+      const svcId = paneEl.dataset.serviceId;
+      if (svcId) this._applyBadge(paneEl, svcId);
+    });
   }
 
   _collectServiceIds(node) {

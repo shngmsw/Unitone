@@ -1294,6 +1294,23 @@ body.resizing-active iframe {
   flex-shrink: 0;
 }
 
+.pane-badge {
+  background: #e53e3e;
+  color: white;
+  border-radius: 9999px;
+  font-size: 8px;
+  font-weight: bold;
+  min-width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.pane-badge.hidden { display: none; }
+
 .pane-body {
   flex: 1;
   pointer-events: none;

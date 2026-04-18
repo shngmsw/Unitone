@@ -520,6 +520,30 @@ pub fn build_tree_for_preset(preset: LayoutPreset) -> LayoutNode {
                 },
             ],
         },
+        LayoutPreset::ThreeH => LayoutNode::Split {
+            direction: SplitDirection::Horizontal,
+            sizes: vec![
+                SplitSize::Flex(1.0),
+                SplitSize::Flex(1.0),
+                SplitSize::Flex(1.0),
+            ],
+            children: vec![empty_leaf("p0"), empty_leaf("p1"), empty_leaf("p2")],
+        },
+        LayoutPreset::FourH => LayoutNode::Split {
+            direction: SplitDirection::Horizontal,
+            sizes: vec![
+                SplitSize::Flex(1.0),
+                SplitSize::Flex(1.0),
+                SplitSize::Flex(1.0),
+                SplitSize::Flex(1.0),
+            ],
+            children: vec![
+                empty_leaf("p0"),
+                empty_leaf("p1"),
+                empty_leaf("p2"),
+                empty_leaf("p3"),
+            ],
+        },
     }
 }
 
@@ -1002,5 +1026,39 @@ mod tests {
             visible: true,
         });
         assert!(collect_service_ids(&tree).is_empty());
+    }
+
+    #[test]
+    fn build_tree_three_h() {
+        let tree = build_tree_for_preset(crate::state::LayoutPreset::ThreeH);
+        if let LayoutNode::Split {
+            direction,
+            children,
+            ..
+        } = &tree
+        {
+            assert_eq!(*direction, SplitDirection::Horizontal);
+            assert_eq!(children.len(), 3);
+        } else {
+            panic!("expected H-Split");
+        }
+        assert_eq!(collect_service_ids(&tree).len(), 0);
+    }
+
+    #[test]
+    fn build_tree_four_h() {
+        let tree = build_tree_for_preset(crate::state::LayoutPreset::FourH);
+        if let LayoutNode::Split {
+            direction,
+            children,
+            ..
+        } = &tree
+        {
+            assert_eq!(*direction, SplitDirection::Horizontal);
+            assert_eq!(children.len(), 4);
+        } else {
+            panic!("expected H-Split");
+        }
+        assert_eq!(collect_service_ids(&tree).len(), 0);
     }
 }

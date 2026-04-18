@@ -135,6 +135,8 @@ pub enum LayoutPreset {
     TwoH,
     TwoV,
     TwoByTwo,
+    ThreeH,
+    FourH,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

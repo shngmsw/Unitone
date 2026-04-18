@@ -137,8 +137,6 @@ export class EventManager {
           }
         }
 
-        this.hitotone.serviceDockManager.render();
-
         const onboarding = document.getElementById('onboarding-screen');
         if (onboarding) this.hitotone.hideModal(onboarding);
 
@@ -176,7 +174,6 @@ export class EventManager {
         this.hitotone.services = await invoke('add_service', {
           service: { id: '', name, url, icon, enabled: true },
         });
-        this.hitotone.serviceDockManager.render();
 
         // 新しいサービスのWebViewを作成
         const newService = this.hitotone.services[this.hitotone.services.length - 1];
@@ -226,7 +223,6 @@ export class EventManager {
         if (service) {
           const updatedService = { ...service, name, url, icon };
           this.hitotone.services = await invoke('update_service', { service: updatedService });
-          this.hitotone.serviceDockManager.render();
 
           // WebViewを再作成（URLが変わった可能性があるため）
           await invoke('remove_service_webview', { serviceId: id });
@@ -306,7 +302,7 @@ export class EventManager {
     // バッジ更新をリッスン
     listen('badge-updated', (event) => {
       const { serviceId, count } = event.payload;
-      this.hitotone.serviceDockManager.updateBadge(serviceId, count);
+      this.hitotone.paneTreeManager.updateBadge(serviceId, count);
     });
 
     // AIに送るをリッスン
@@ -317,12 +313,6 @@ export class EventManager {
     // 認証完了時
     listen('auth-completed', (event) => {
       this.hitotone.webViewManager.navigateActiveWebview(event.payload);
-    });
-
-    // favicon更新をリッスン
-    listen('favicon-updated', (event) => {
-      const { serviceId, faviconUrl } = event.payload;
-      this.hitotone.serviceDockManager.updateServiceIcon(serviceId, faviconUrl);
     });
   }
 }

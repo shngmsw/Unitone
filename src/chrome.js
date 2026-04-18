@@ -4,6 +4,7 @@ import { PresetPickerManager } from './PresetPickerManager.js';
 
 let spaces = [];
 let activeSpaceId = null;
+let badgeCounts = {};
 
 async function init() {
   try {
@@ -34,6 +35,11 @@ function renderSpaces() {
     item.title = space.name;
     item.textContent = String(idx + 1);
 
+    const badge = document.createElement('span');
+    badge.className = 'space-badge hidden';
+    badge.dataset.spaceId = space.id;
+    item.appendChild(badge);
+
     const delBtn = document.createElement('button');
     delBtn.className = 'space-delete';
     delBtn.title = '削除';
@@ -53,6 +59,8 @@ function renderSpaces() {
     item.addEventListener('click', () => switchSpace(space.id));
     list.appendChild(item);
   });
+
+  _updateAllSpaceBadges();
 }
 
 async function switchSpace(spaceId) {
@@ -93,6 +101,33 @@ function setupButtons() {
   });
 }
 
+function _updateAllSpaceBadges() {
+  spaces.forEach(space => {
+    const spaceServiceIds = _collectServiceIds(space.tree);
+    const total = spaceServiceIds.reduce((sum, id) => sum + (badgeCounts[id] || 0), 0);
+    const badge = document.querySelector(`.space-badge[data-space-id="${space.id}"]`);
+    if (!badge) return;
+    if (total > 0) {
+      badge.textContent = total > 99 ? '99+' : String(total);
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  });
+}
+
+function _collectServiceIds(node) {
+  if (!node) return [];
+  if (node.Leaf) {
+    const id = node.Leaf.kind?.Service;
+    return id ? [id] : [];
+  }
+  if (node.Split) {
+    return node.Split.children.flatMap(_collectServiceIds);
+  }
+  return [];
+}
+
 function setupListeners() {
   listen('space-list-updated', async () => {
     spaces = await invoke('get_spaces');
@@ -103,6 +138,12 @@ function setupListeners() {
   listen('pane-tree-updated', async () => {
     activeSpaceId = await invoke('get_active_space_id');
     renderSpaces();
+  });
+
+  listen('badge-updated', (e) => {
+    const { serviceId, count } = e.payload;
+    badgeCounts[serviceId] = count;
+    _updateAllSpaceBadges();
   });
 }
 

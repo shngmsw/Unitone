@@ -246,10 +246,12 @@ pub fn create_service_webview(
 ) -> Result<tauri::Webview, String> {
     let parsed_url: url::Url = url.parse().map_err(|e: url::ParseError| e.to_string())?;
 
+    let service_id = label.strip_prefix("service-").unwrap_or(label);
     let webview_builder =
         tauri::WebviewBuilder::new(label, tauri::WebviewUrl::External(parsed_url.clone()))
             .user_agent(CHROME_USER_AGENT)
             .initialization_script(browser_spoof_script())
+            .initialization_script(crate::notification::get_notification_script(service_id))
             .on_navigation({
                 let app_handle = app.clone();
                 let initial_url = parsed_url.clone();

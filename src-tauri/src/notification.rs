@@ -4,7 +4,6 @@ use tauri::{Emitter, Manager};
 
 /// Generate the notification detection JavaScript that will be injected into service webviews.
 /// This script monitors document.title changes and sends notification count updates.
-#[allow(dead_code)]
 pub fn get_notification_script(service_id: &str) -> String {
     format!(
         r#"(function() {{
