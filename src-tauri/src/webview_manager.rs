@@ -329,39 +329,6 @@ pub fn create_ai_webview(
     Ok(webview)
 }
 
-/// Switch visible service webview: show the active one, hide others.
-pub fn switch_service(app_handle: &tauri::AppHandle, active_service_id: &str, state: &AppState) {
-    let viewport = match app_handle.get_window("main").and_then(|w| get_viewport(&w)) {
-        Some(v) => v,
-        None => return,
-    };
-    let mut state_for_tree = state.clone();
-    state_for_tree.active_service_id = active_service_id.to_string();
-    let tree = crate::layout::build_tree_from_state(&state_for_tree);
-    let rects = crate::layout::compute_rects(&tree, viewport);
-
-    let svc_key = format!("service:{}", active_service_id);
-    let svc_rect = rects
-        .iter()
-        .find(|(id, _)| id.0 == svc_key)
-        .map(|(_, r)| *r);
-
-    for label in &state.created_webview_labels {
-        if let Some(wv) = app_handle.get_webview(label) {
-            let service_id = label.strip_prefix("service-").unwrap_or(label);
-            if service_id == active_service_id {
-                if let Some(r) = svc_rect {
-                    let _ = wv.set_position(tauri::LogicalPosition::new(r.x as f64, r.y as f64));
-                    let _ = wv.set_size(tauri::LogicalSize::new(r.width as f64, r.height as f64));
-                }
-                let _ = wv.show();
-            } else {
-                let _ = wv.hide();
-            }
-        }
-    }
-}
-
 /// Create the titlebar child Webview.
 #[allow(dead_code)]
 pub fn create_titlebar_webview(
@@ -379,65 +346,74 @@ pub fn create_titlebar_webview(
         .map_err(|e| e.to_string())
 }
 
-/// Update layout of all child webviews (titlebar + chrome + services + AI).
+/// Update layout of all child webviews (chrome + service tree + AI).
 pub fn update_layout(app_handle: &tauri::AppHandle, state: &AppState) {
     let viewport = match app_handle.get_window("main").and_then(|w| get_viewport(&w)) {
         Some(v) => v,
         None => return,
     };
 
-    // Titlebar: full width, fixed height at top
-    if let Some(wv) = app_handle.get_webview("titlebar") {
-        let tb = crate::layout::TITLE_BAR_HEIGHT;
-        let _ = wv.set_position(tauri::LogicalPosition::new(0.0, 0.0));
-        let _ = wv.set_size(tauri::LogicalSize::new(viewport.width as f64, tb as f64));
-    }
+    let tb = crate::layout::TITLE_BAR_HEIGHT;
+    let header_h = crate::layout::PANE_HEADER_HEIGHT;
 
-    let tree = crate::layout::build_tree_from_state(state);
-    let rects = crate::layout::compute_rects(&tree, viewport);
-
-    // Chrome
+    // Chrome (dock) — fixed rect below titlebar
     if let Some(wv) = app_handle.get_webview("chrome") {
-        if let Some((_, r)) = rects.iter().find(|(id, _)| id.0 == "chrome") {
-            let _ = wv.set_position(tauri::LogicalPosition::new(r.x as f64, r.y as f64));
-            let _ = wv.set_size(tauri::LogicalSize::new(r.width as f64, r.height as f64));
-        }
+        let _ = wv.set_position(tauri::LogicalPosition::new(0.0, tb as f64));
+        let _ = wv.set_size(tauri::LogicalSize::new(
+            crate::layout::DOCK_WIDTH as f64,
+            (viewport.height - tb) as f64,
+        ));
     }
 
-    // Service webviews
-    let svc_key = format!("service:{}", state.active_service_id);
-    let svc_rect = rects
-        .iter()
-        .find(|(id, _)| id.0 == svc_key)
-        .map(|(_, r)| *r);
-    for label in &state.created_webview_labels {
-        if let Some(wv) = app_handle.get_webview(label) {
-            let service_id = label.strip_prefix("service-").unwrap_or(label);
-            if service_id == state.active_service_id {
-                if let Some(r) = svc_rect {
-                    let _ = wv.set_position(tauri::LogicalPosition::new(r.x as f64, r.y as f64));
-                    let _ = wv.set_size(tauri::LogicalSize::new(r.width as f64, r.height as f64));
+    // Service tree — compute rects, position/show each leaf's webview
+    let zone = crate::layout::compute_service_zone_rect(viewport, state);
+    let pane_rects = crate::layout::compute_rects(&state.service_tree, zone);
+
+    let present_ids: std::collections::HashSet<String> =
+        crate::layout::collect_service_ids(&state.service_tree)
+            .into_iter()
+            .collect();
+
+    for (pane_id, rect) in &pane_rects {
+        if let Some(pane) = crate::layout::find_pane(&state.service_tree, pane_id) {
+            if let crate::state::PaneKind::Service(svc_id) = &pane.kind {
+                if svc_id.is_empty() {
+                    continue;
                 }
-                let _ = wv.show();
-            } else {
-                let _ = wv.hide();
+                let label = format!("service-{}", svc_id);
+                if let Some(wv) = app_handle.get_webview(&label) {
+                    let y = rect.y + header_h;
+                    let h = (rect.height - header_h).max(0.0);
+                    let _ = wv.set_position(tauri::LogicalPosition::new(rect.x as f64, y as f64));
+                    let _ = wv.set_size(tauri::LogicalSize::new(rect.width as f64, h as f64));
+                    let _ = wv.show();
+                }
             }
         }
     }
 
-    // AI webview — offset by RESIZE_GAP to expose index.html's resize handle
+    // Hide service webviews no longer in tree
+    for label in &state.created_webview_labels {
+        if let Some(svc_id) = label.strip_prefix("service-") {
+            if !present_ids.contains(svc_id) {
+                if let Some(wv) = app_handle.get_webview(label) {
+                    let _ = wv.hide();
+                }
+            }
+        }
+    }
+
+    // AI webview — fixed right panel, offset by RESIZE_GAP for the resize handle
     if state.ai_webview_created {
         if let Some(wv) = app_handle.get_webview("ai-webview") {
             if state.show_ai_companion {
-                if let Some((_, r)) = rects.iter().find(|(id, _)| id.0 == "ai") {
-                    let gap = crate::layout::RESIZE_GAP;
-                    let _ = wv
-                        .set_position(tauri::LogicalPosition::new((r.x + gap) as f64, r.y as f64));
-                    let _ = wv.set_size(tauri::LogicalSize::new(
-                        (r.width - gap).max(0.0) as f64,
-                        r.height as f64,
-                    ));
-                }
+                let gap = crate::layout::RESIZE_GAP;
+                let ai_x = zone.x + zone.width + gap;
+                let _ = wv.set_position(tauri::LogicalPosition::new(ai_x as f64, tb as f64));
+                let _ = wv.set_size(tauri::LogicalSize::new(
+                    (state.ai_width as f32).max(0.0) as f64,
+                    (viewport.height - tb) as f64,
+                ));
                 let _ = wv.show();
             } else {
                 let _ = wv.hide();

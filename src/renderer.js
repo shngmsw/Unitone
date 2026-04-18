@@ -6,6 +6,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { AiCompanionManager } from './AiCompanionManager.js';
 import { EventManager } from './EventManager.js';
 import { LoadingManager } from './LoadingManager.js';
+import { PaneTreeManager } from './PaneTreeManager.js';
 import { ServiceDockManager } from './ServiceDockManager.js';
 import { SettingsManager } from './SettingsManager.js';
 import { UpdateManager } from './UpdateManager.js';
@@ -27,6 +28,7 @@ class Hitotone {
     this.settingsManager = new SettingsManager(this);
     this.eventManager = new EventManager(this);
     this.updateManager = new UpdateManager();
+    this.paneTreeManager = new PaneTreeManager(this);
 
     this.init();
   }
@@ -87,6 +89,12 @@ class Hitotone {
       } catch (err) {
         console.warn('[Hitotone] webview creation error (non-fatal):', err);
       }
+
+      // ペインツリーDOM初期化
+      await this.paneTreeManager.init();
+
+      // pane-tree-updated イベントでDOM再描画（dock クリック / split / close 後）
+      listen('pane-tree-updated', () => this.paneTreeManager.refresh());
 
       // AIコンパニオンを設定
       try {

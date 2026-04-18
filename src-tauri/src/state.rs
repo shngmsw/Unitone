@@ -60,6 +60,12 @@ pub struct AppState {
     /// Whether AI webview has been created
     #[serde(skip)]
     pub ai_webview_created: bool,
+    /// Authoritative service pane layout tree (not persisted, reset on startup)
+    #[serde(skip)]
+    pub service_tree: Arc<LayoutNode>,
+    /// The pane that receives dock-click service assignments
+    #[serde(skip)]
+    pub focused_pane_id: Option<PaneId>,
 }
 
 // ========================================
@@ -108,8 +114,20 @@ pub enum LayoutNode {
 
 pub type LayoutTree = Arc<LayoutNode>;
 
+impl Default for LayoutNode {
+    fn default() -> Self {
+        LayoutNode::Leaf(Pane {
+            id: PaneId("root".into()),
+            kind: PaneKind::Service(String::new()),
+            webview_label: String::new(),
+            visible: true,
+        })
+    }
+}
+
 impl Default for AppState {
     fn default() -> Self {
+        let root_id = PaneId("root".into());
         Self {
             services: Vec::new(),
             ai_services: vec![
@@ -140,6 +158,13 @@ impl Default for AppState {
             badge_counts: HashMap::new(),
             created_webview_labels: Vec::new(),
             ai_webview_created: false,
+            service_tree: Arc::new(LayoutNode::Leaf(Pane {
+                id: root_id.clone(),
+                kind: PaneKind::Service(String::new()),
+                webview_label: String::new(),
+                visible: true,
+            })),
+            focused_pane_id: Some(root_id),
         }
     }
 }

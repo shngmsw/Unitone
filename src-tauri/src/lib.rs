@@ -56,6 +56,11 @@ pub fn run() {
             commands::hide_all_child_webviews,
             commands::restore_child_webviews,
             commands::request_open_modal,
+            commands::get_service_tree,
+            commands::split_pane,
+            commands::close_pane,
+            commands::resize_split,
+            commands::focus_pane,
         ])
         .on_window_event(|window, event| {
             let app_handle = window.app_handle();
@@ -106,24 +111,38 @@ pub fn run() {
                     let viewport = webview_manager::get_viewport(main_win);
 
                     if let Some(vp) = viewport {
+                        // Inject active service into service_tree root pane
+                        if let Some((active_svc_id, _)) = services_info
+                            .iter()
+                            .find(|(id, _)| *id == active_service_id)
+                            .or_else(|| services_info.first())
+                        {
+                            let state = app.state::<RwLock<AppState>>();
+                            let mut s = state.blocking_write();
+                            let focused = s
+                                .focused_pane_id
+                                .clone()
+                                .unwrap_or(crate::state::PaneId("root".into()));
+                            if let Ok(new_tree) = layout::assign_service_to_pane(
+                                &s.service_tree,
+                                &focused,
+                                active_svc_id.clone(),
+                            ) {
+                                s.service_tree = std::sync::Arc::new(new_tree);
+                            }
+                        }
+
                         let (chrome_rect, svc_rect_opt) = {
                             let state = app.state::<RwLock<AppState>>();
                             let s = state.blocking_read();
-                            let tree = layout::build_tree_from_state(&s);
-                            let rects = layout::compute_rects(&tree, vp);
-
-                            let chrome_r = rects
-                                .iter()
-                                .find(|(id, _)| id.0 == "chrome")
-                                .map(|(_, r)| *r);
-
-                            let active_key = format!("service:{}", active_service_id);
-                            let svc_r = rects
-                                .iter()
-                                .find(|(id, _)| id.0 == active_key)
-                                .map(|(_, r)| *r);
-
-                            (chrome_r, svc_r)
+                            let chrome_r = Some(crate::layout::Rect {
+                                x: 0.0,
+                                y: layout::TITLE_BAR_HEIGHT,
+                                width: layout::DOCK_WIDTH,
+                                height: vp.height - layout::TITLE_BAR_HEIGHT,
+                            });
+                            let svc_zone = Some(layout::compute_service_zone_rect(vp, &s));
+                            (chrome_r, svc_zone)
                         };
 
                         let mut created_labels: Vec<String> = Vec::new();
