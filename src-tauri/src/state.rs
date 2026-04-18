@@ -102,6 +102,15 @@ pub enum SplitSize {
     Flex(f32),
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LayoutPreset {
+    Single,
+    TwoH,
+    TwoV,
+    TwoByTwo,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum LayoutNode {
     Leaf(Pane),

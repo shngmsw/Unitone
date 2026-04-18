@@ -1195,7 +1195,7 @@ body.resizing-active iframe {
 }
 
 /* ========================================
- * Phase 3 — Pane Tree
+ * Phase 3/4 — Pane Tree
  * ======================================== */
 
 .split {
@@ -1230,53 +1230,68 @@ body.resizing-active iframe {
 .pane-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 6px 0 8px;
+  padding: 0;
   background: rgba(15, 20, 40, 0.85);
   backdrop-filter: blur(4px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   pointer-events: all;
   user-select: none;
-  gap: 4px;
   flex-shrink: 0;
+  overflow: visible;
+  position: relative;
 }
 
-.pane-service-name {
-  font-size: 11px;
+/* Focused pane: header gets accent tint + left border indicator */
+.pane-focused > .pane-header {
+  background: rgba(99, 179, 237, 0.12);
+  border-bottom-color: rgba(99, 179, 237, 0.3);
+}
+
+.pane-focused > .pane-header::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(99, 179, 237, 0.8);
+  border-radius: 0 1px 1px 0;
+}
+
+/* Service dropdown button fills the entire header */
+.pane-service-dropdown {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px 0 10px;
   color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  transition: background 0.12s;
+}
+
+.pane-service-dropdown:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.pane-dropdown-label {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  letter-spacing: 0.02em;
+  text-align: left;
 }
 
-.pane-actions {
-  display: flex;
-  gap: 1px;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.pane-header:hover .pane-actions {
-  opacity: 1;
-}
-
-.pane-btn {
-  background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.45);
-  cursor: pointer;
-  font-size: 12px;
-  padding: 2px 5px;
-  border-radius: 3px;
-  line-height: 1;
-  transition: background-color 0.1s, color 0.1s;
-}
-
-.pane-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.9);
+.pane-dropdown-arrow {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.3);
+  flex-shrink: 0;
 }
 
 .pane-body {
@@ -1284,6 +1299,62 @@ body.resizing-active iframe {
   pointer-events: none;
 }
 
+/* Service picker dropdown menu */
+.service-picker-menu {
+  list-style: none;
+  background: #1e2a4a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  overflow: hidden;
+  padding: 4px 0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.service-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+  transition: background 0.1s;
+}
+
+.service-picker-item:hover {
+  background: rgba(99, 179, 237, 0.15);
+}
+
+.service-picker-item.current {
+  color: rgba(99, 179, 237, 1);
+}
+
+.service-picker-item.assigned {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.service-picker-item.assigned:hover {
+  background: transparent;
+}
+
+.picker-icon {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.picker-check {
+  margin-left: auto;
+  color: rgba(99, 179, 237, 0.9);
+  font-size: 12px;
+}
+
+/* Split dividers */
 .split-divider {
   flex-shrink: 0;
   background: rgba(255, 255, 255, 0.08);

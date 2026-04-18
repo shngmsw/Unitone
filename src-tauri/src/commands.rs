@@ -1,6 +1,7 @@
 use crate::layout;
 use crate::state::{
-    AiService, AppState, LayoutNode, Pane, PaneId, PaneKind, Service, SplitDirection, SplitSize,
+    AiService, AppState, LayoutNode, LayoutPreset, Pane, PaneId, PaneKind, Service, SplitDirection,
+    SplitSize,
 };
 use crate::store;
 use crate::webview_manager;
@@ -871,12 +872,24 @@ pub async fn update_favicon(
 }
 
 // ========================================
-// Phase 3 — Pane tree commands
+// Phase 3/4 — Pane tree commands
 // ========================================
 
+/// Returned by get_service_tree, apply_layout_preset, switch_service_in_pane.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PaneTreeState {
+    pub tree: LayoutNode,
+    pub focused_pane_id: Option<String>,
+}
+
 #[tauri::command]
-pub async fn get_service_tree(state: State<'_, RwLock<AppState>>) -> Result<LayoutNode, String> {
-    Ok((*state.read().await.service_tree).clone())
+pub async fn get_service_tree(state: State<'_, RwLock<AppState>>) -> Result<PaneTreeState, String> {
+    let s = state.read().await;
+    Ok(PaneTreeState {
+        tree: (*s.service_tree).clone(),
+        focused_pane_id: s.focused_pane_id.as_ref().map(|id| id.0.clone()),
+    })
 }
 
 #[tauri::command]
@@ -1016,6 +1029,124 @@ pub async fn resize_split(
 pub async fn focus_pane(state: State<'_, RwLock<AppState>>, pane_id: String) -> Result<(), String> {
     state.write().await.focused_pane_id = Some(PaneId(pane_id));
     Ok(())
+}
+
+#[tauri::command]
+pub async fn apply_layout_preset(
+    app: AppHandle,
+    state: State<'_, RwLock<AppState>>,
+    preset: LayoutPreset,
+) -> Result<PaneTreeState, String> {
+    let current_services = {
+        let s = state.read().await;
+        layout::collect_service_ids(&s.service_tree)
+    };
+
+    let preset_tree = layout::build_tree_for_preset(preset);
+    let filled_tree = layout::fill_preset_with_services(preset_tree, &current_services);
+    let new_focus = layout::first_pane_id(&filled_tree);
+
+    {
+        let mut s = state.write().await;
+        s.service_tree = Arc::new(filled_tree);
+        s.focused_pane_id = new_focus;
+        if let Some(svc) = layout::collect_service_ids(&s.service_tree)
+            .into_iter()
+            .next()
+        {
+            s.active_service_id = svc;
+        }
+    }
+
+    let snapshot = state.read().await.clone();
+    webview_manager::update_layout(&app, &snapshot);
+    let _ = app.emit("pane-tree-updated", ());
+
+    let s = state.read().await;
+    Ok(PaneTreeState {
+        tree: (*s.service_tree).clone(),
+        focused_pane_id: s.focused_pane_id.as_ref().map(|id| id.0.clone()),
+    })
+}
+
+#[tauri::command]
+pub async fn switch_service_in_pane(
+    app: AppHandle,
+    state: State<'_, RwLock<AppState>>,
+    pane_id: String,
+    service_id: String,
+) -> Result<PaneTreeState, String> {
+    let target = PaneId(pane_id.clone());
+    let label = format!("service-{}", service_id);
+
+    // Duplicate check: reject if service is already in a different pane
+    {
+        let s = state.read().await;
+        let current_in_target = layout::find_pane(&s.service_tree, &target).and_then(|p| {
+            if let PaneKind::Service(id) = &p.kind {
+                if !id.is_empty() {
+                    Some(id.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        });
+        if current_in_target.as_deref() != Some(&service_id)
+            && layout::collect_service_ids(&s.service_tree).contains(&service_id)
+        {
+            return Err(format!(
+                "service '{}' is already open in another pane",
+                service_id
+            ));
+        }
+    }
+
+    // Lazy webview creation
+    if app.get_webview(&label).is_none() {
+        let (url_opt, zone_opt) = {
+            let s = state.read().await;
+            let url = s
+                .services
+                .iter()
+                .find(|svc| svc.id == service_id)
+                .map(|svc| svc.url.clone());
+            let zone = app
+                .get_window("main")
+                .and_then(|w| webview_manager::get_viewport(&w))
+                .map(|vp| layout::compute_service_zone_rect(vp, &s));
+            (url, zone)
+        };
+        if let (Some(url), Some(zone)) = (url_opt, zone_opt) {
+            crate::webview_ops::create_service(&app, label.clone(), url, zone).await?;
+            let mut s = state.write().await;
+            if !s.created_webview_labels.contains(&label) {
+                s.created_webview_labels.push(label);
+            }
+        }
+    }
+
+    // Update tree
+    {
+        let mut s = state.write().await;
+        let new_tree =
+            layout::assign_service_to_pane(&s.service_tree, &target, service_id.clone())?;
+        s.service_tree = Arc::new(new_tree);
+        s.focused_pane_id = Some(target);
+        s.active_service_id = service_id.clone();
+    }
+    store::save_value(&app, "activeServiceId", &service_id);
+
+    let snapshot = state.read().await.clone();
+    webview_manager::update_layout(&app, &snapshot);
+    let _ = app.emit("pane-tree-updated", ());
+
+    let s = state.read().await;
+    Ok(PaneTreeState {
+        tree: (*s.service_tree).clone(),
+        focused_pane_id: s.focused_pane_id.as_ref().map(|id| id.0.clone()),
+    })
 }
 
 // ========================================

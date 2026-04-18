@@ -61,6 +61,8 @@ pub fn run() {
             commands::close_pane,
             commands::resize_split,
             commands::focus_pane,
+            commands::apply_layout_preset,
+            commands::switch_service_in_pane,
         ])
         .on_window_event(|window, event| {
             let app_handle = window.app_handle();

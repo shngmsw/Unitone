@@ -8,17 +8,21 @@ export class PaneTreeManager {
     this.app = app;
     this.container = null;
     this.tree = null;
+    this.focusedPaneId = null;
     this._dragState = null;
     this._animFrameId = null;
 
     document.addEventListener('mousemove', this._onDragMove.bind(this));
     document.addEventListener('mouseup', this._onDragEnd.bind(this));
+    document.addEventListener('click', this._onDocumentClick.bind(this));
   }
 
   async init() {
     this.container = document.getElementById('webview-container');
     try {
-      this.tree = await invoke('get_service_tree');
+      const result = await invoke('get_service_tree');
+      this.tree = result.tree;
+      this.focusedPaneId = result.focusedPaneId;
       this._render();
     } catch (e) {
       console.error('[PaneTreeManager] init failed:', e);
@@ -27,7 +31,9 @@ export class PaneTreeManager {
 
   async refresh() {
     try {
-      this.tree = await invoke('get_service_tree');
+      const result = await invoke('get_service_tree');
+      this.tree = result.tree;
+      this.focusedPaneId = result.focusedPaneId;
       this._render();
     } catch (e) {
       console.error('[PaneTreeManager] refresh failed:', e);
@@ -54,9 +60,11 @@ export class PaneTreeManager {
 
   _buildLeaf(pane) {
     const svcId = (typeof pane.kind === 'object' && pane.kind.Service) ? pane.kind.Service : '';
+    const isFocused = pane.id === this.focusedPaneId;
+    const isEmpty = !svcId;
 
     const div = document.createElement('div');
-    div.className = 'pane';
+    div.className = 'pane' + (isFocused ? ' pane-focused' : '');
     div.dataset.paneId = pane.id;
     div.dataset.serviceId = svcId;
 
@@ -64,28 +72,21 @@ export class PaneTreeManager {
     header.className = 'pane-header';
     header.style.height = PANE_HEADER_HEIGHT + 'px';
 
-    const name = document.createElement('span');
-    name.className = 'pane-service-name';
-    name.textContent = svcId ? this._getServiceName(svcId) : '—';
+    const dropdownBtn = document.createElement('button');
+    dropdownBtn.className = 'pane-service-dropdown';
+    dropdownBtn.dataset.paneId = pane.id;
 
-    const actions = document.createElement('div');
-    actions.className = 'pane-actions';
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'pane-dropdown-label';
+    nameSpan.textContent = isEmpty ? 'アプリを選択' : this._getServiceName(svcId);
 
-    for (const [action, label, title] of [
-      ['split-h', '⇔', '横分割'],
-      ['split-v', '⇕', '縦分割'],
-      ['close', '×', '閉じる'],
-    ]) {
-      const btn = document.createElement('button');
-      btn.className = 'pane-btn';
-      btn.dataset.action = action;
-      btn.title = title;
-      btn.textContent = label;
-      actions.appendChild(btn);
-    }
+    const arrowSpan = document.createElement('span');
+    arrowSpan.className = 'pane-dropdown-arrow';
+    arrowSpan.textContent = '▾';
 
-    header.appendChild(name);
-    header.appendChild(actions);
+    dropdownBtn.appendChild(nameSpan);
+    dropdownBtn.appendChild(arrowSpan);
+    header.appendChild(dropdownBtn);
 
     const body = document.createElement('div');
     body.className = 'pane-body';
@@ -149,44 +150,38 @@ export class PaneTreeManager {
   _bindEvents() {
     if (!this.container) return;
 
+    // Pane click → focus
     this.container.querySelectorAll('.pane').forEach(paneEl => {
       paneEl.addEventListener('click', e => {
-        if (e.target.closest('.pane-actions, .split-divider')) return;
+        if (e.target.closest('.pane-service-dropdown, .split-divider')) return;
         const paneId = paneEl.dataset.paneId;
-        if (paneId) invoke('focus_pane', { paneId }).catch(console.error);
-      });
-    });
-
-    this.container.querySelectorAll('.pane-btn').forEach(btn => {
-      btn.addEventListener('click', async e => {
-        e.stopPropagation();
-        const paneEl = btn.closest('.pane');
-        const paneId = paneEl?.dataset.paneId;
-        const action = btn.dataset.action;
-        if (!paneId) return;
-
-        try {
-          await invoke('focus_pane', { paneId });
-
-          if (action === 'close') {
-            this.tree = await invoke('close_pane', { paneId });
-            this._render();
-          } else if (action === 'split-h' || action === 'split-v') {
-            const direction = action === 'split-h' ? 'Horizontal' : 'Vertical';
-            const newServiceId = this._pickAvailableService(paneEl.dataset.serviceId);
-            if (!newServiceId) {
-              console.warn('[PaneTreeManager] no available service for split');
-              return;
-            }
-            this.tree = await invoke('split_pane', { paneId, direction, newServiceId });
-            this._render();
-          }
-        } catch (err) {
-          console.error('[PaneTreeManager] action error:', err);
+        if (paneId) {
+          this.focusedPaneId = paneId;
+          this._updateFocusVisuals();
+          invoke('focus_pane', { paneId }).catch(console.error);
         }
       });
     });
 
+    // Dropdown button click
+    this.container.querySelectorAll('.pane-service-dropdown').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const paneId = btn.dataset.paneId;
+        const paneEl = btn.closest('.pane');
+        const currentSvcId = paneEl?.dataset.serviceId || '';
+
+        if (paneId) {
+          this.focusedPaneId = paneId;
+          this._updateFocusVisuals();
+          invoke('focus_pane', { paneId }).catch(console.error);
+        }
+
+        this._openServicePicker(btn, paneId, currentSvcId);
+      });
+    });
+
+    // Divider drag
     this.container.querySelectorAll('.split-divider').forEach(divider => {
       divider.addEventListener('mousedown', e => {
         e.preventDefault();
@@ -218,6 +213,86 @@ export class PaneTreeManager {
     });
   }
 
+  _openServicePicker(anchor, paneId, currentSvcId) {
+    this._closeServicePicker();
+
+    const services = this.app?.services ?? [];
+    const usedIds = new Set(this._collectServiceIds(this.tree));
+
+    const menu = document.createElement('ul');
+    menu.className = 'service-picker-menu';
+    menu.dataset.forPane = paneId;
+
+    services.filter(s => s.enabled).forEach(svc => {
+      const li = document.createElement('li');
+      li.className = 'service-picker-item';
+      const isCurrent = svc.id === currentSvcId;
+      const isAssigned = usedIds.has(svc.id) && !isCurrent;
+
+      if (isCurrent) li.classList.add('current');
+      if (isAssigned) li.classList.add('assigned');
+
+      const icon = document.createElement('span');
+      icon.className = 'picker-icon';
+      icon.textContent = svc.icon || '🔗';
+
+      const name = document.createElement('span');
+      name.textContent = svc.name;
+
+      if (isCurrent) {
+        const check = document.createElement('span');
+        check.className = 'picker-check';
+        check.textContent = '✓';
+        li.appendChild(icon);
+        li.appendChild(name);
+        li.appendChild(check);
+      } else {
+        li.appendChild(icon);
+        li.appendChild(name);
+      }
+
+      if (!isAssigned) {
+        li.addEventListener('click', async e => {
+          e.stopPropagation();
+          this._closeServicePicker();
+          try {
+            const result = await invoke('switch_service_in_pane', { paneId, serviceId: svc.id });
+            this.tree = result.tree;
+            this.focusedPaneId = result.focusedPaneId;
+            this._render();
+          } catch (err) {
+            console.error('[PaneTreeManager] switch_service_in_pane error:', err);
+          }
+        });
+      }
+
+      menu.appendChild(li);
+    });
+
+    // Position below anchor
+    const rect = anchor.getBoundingClientRect();
+    menu.style.position = 'fixed';
+    menu.style.left = rect.left + 'px';
+    menu.style.top = rect.bottom + 'px';
+    menu.style.minWidth = rect.width + 'px';
+
+    document.body.appendChild(menu);
+  }
+
+  _closeServicePicker() {
+    document.querySelectorAll('.service-picker-menu').forEach(el => el.remove());
+  }
+
+  _onDocumentClick() {
+    this._closeServicePicker();
+  }
+
+  _updateFocusVisuals() {
+    this.container?.querySelectorAll('.pane').forEach(el => {
+      el.classList.toggle('pane-focused', el.dataset.paneId === this.focusedPaneId);
+    });
+  }
+
   _onDragMove(e) {
     if (!this._dragState) return;
 
@@ -237,7 +312,6 @@ export class PaneTreeManager {
         else if (s?.Fixed !== undefined) wrapper.style.flex = `0 0 ${s.Fixed}px`;
       });
 
-      // Update native webview layout
       invoke('resize_split', { path, sizes: newSizes }).catch(console.error);
     });
   }
@@ -273,13 +347,6 @@ export class PaneTreeManager {
     const child = node.Split.children[idx];
     if (!child) return null;
     return this._getSplitNode(child, rest);
-  }
-
-  _pickAvailableService(currentServiceId) {
-    const services = this.app?.services ?? [];
-    const usedIds = new Set(this._collectServiceIds(this.tree));
-    const available = services.filter(s => s.enabled && !usedIds.has(s.id) && s.id !== currentServiceId);
-    return available[0]?.id ?? null;
   }
 
   _collectServiceIds(node) {

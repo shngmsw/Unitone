@@ -1,5 +1,6 @@
 use crate::state::{
-    AppState, LayoutNode, LayoutTree, Pane, PaneId, PaneKind, SplitDirection, SplitSize,
+    AppState, LayoutNode, LayoutPreset, LayoutTree, Pane, PaneId, PaneKind, SplitDirection,
+    SplitSize,
 };
 use std::sync::Arc;
 
@@ -9,6 +10,8 @@ pub const MIN_SERVICE_WIDTH: f32 = 100.0;
 /// Gap between service webview right edge and AI webview left edge.
 /// Exposes index.html's #resize-handle which is blocked by child webviews otherwise.
 pub const RESIZE_GAP: f32 = 8.0;
+/// Width/height of split divider elements in the DOM (.split-divider-h / -v).
+pub const DIVIDER_SIZE: f32 = 4.0;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Rect {
@@ -76,6 +79,7 @@ pub fn build_tree_from_state(state: &AppState) -> LayoutTree {
 }
 
 /// Compute rects for all leaf panes from a layout tree and viewport.
+/// Accounts for DIVIDER_SIZE pixels of space between each child pair (matching DOM flex layout).
 /// Pure function — no Tauri dependency.
 pub fn compute_rects(node: &LayoutNode, viewport: Rect) -> Vec<(PaneId, Rect)> {
     match node {
@@ -111,7 +115,8 @@ pub fn compute_rects(node: &LayoutNode, viewport: Rect) -> Vec<(PaneId, Rect)> {
                 })
                 .sum();
 
-            let remaining = (total - fixed_total).max(0.0);
+            let divider_total = DIVIDER_SIZE * (count as f32 - 1.0);
+            let remaining = (total - fixed_total - divider_total).max(0.0);
 
             let mut offset = match direction {
                 SplitDirection::Horizontal => viewport.x,
@@ -148,6 +153,9 @@ pub fn compute_rects(node: &LayoutNode, viewport: Rect) -> Vec<(PaneId, Rect)> {
 
                 result.extend(compute_rects(child, child_rect));
                 offset += size;
+                if i < count - 1 {
+                    offset += DIVIDER_SIZE;
+                }
             }
             result
         }
@@ -462,10 +470,92 @@ pub fn assign_service_to_pane(
     }
 }
 
-fn first_pane_id(node: &LayoutNode) -> Option<PaneId> {
+pub fn first_pane_id(node: &LayoutNode) -> Option<PaneId> {
     match node {
         LayoutNode::Leaf(pane) => Some(pane.id.clone()),
         LayoutNode::Split { children, .. } => children.first().and_then(first_pane_id),
+    }
+}
+
+// ========================================
+// Preset layout builders (Phase 4)
+// ========================================
+
+fn empty_leaf(id: &str) -> LayoutNode {
+    LayoutNode::Leaf(Pane {
+        id: PaneId(id.into()),
+        kind: PaneKind::Service(String::new()),
+        webview_label: String::new(),
+        visible: true,
+    })
+}
+
+/// Build a tree skeleton for the given preset (all leaves empty).
+pub fn build_tree_for_preset(preset: LayoutPreset) -> LayoutNode {
+    match preset {
+        LayoutPreset::Single => empty_leaf("p0"),
+        LayoutPreset::TwoH => LayoutNode::Split {
+            direction: SplitDirection::Horizontal,
+            sizes: vec![SplitSize::Flex(1.0), SplitSize::Flex(1.0)],
+            children: vec![empty_leaf("p0"), empty_leaf("p1")],
+        },
+        LayoutPreset::TwoV => LayoutNode::Split {
+            direction: SplitDirection::Vertical,
+            sizes: vec![SplitSize::Flex(1.0), SplitSize::Flex(1.0)],
+            children: vec![empty_leaf("p0"), empty_leaf("p1")],
+        },
+        LayoutPreset::TwoByTwo => LayoutNode::Split {
+            direction: SplitDirection::Horizontal,
+            sizes: vec![SplitSize::Flex(1.0), SplitSize::Flex(1.0)],
+            children: vec![
+                LayoutNode::Split {
+                    direction: SplitDirection::Vertical,
+                    sizes: vec![SplitSize::Flex(1.0), SplitSize::Flex(1.0)],
+                    children: vec![empty_leaf("p0"), empty_leaf("p1")],
+                },
+                LayoutNode::Split {
+                    direction: SplitDirection::Vertical,
+                    sizes: vec![SplitSize::Flex(1.0), SplitSize::Flex(1.0)],
+                    children: vec![empty_leaf("p2"), empty_leaf("p3")],
+                },
+            ],
+        },
+    }
+}
+
+/// Fill empty leaves of a preset tree with service IDs in tree-walk order.
+/// Leaves that exceed service_ids length remain empty.
+pub fn fill_preset_with_services(tree: LayoutNode, service_ids: &[String]) -> LayoutNode {
+    let mut idx = 0usize;
+    fill_services_recursive(tree, service_ids, &mut idx)
+}
+
+fn fill_services_recursive(node: LayoutNode, services: &[String], idx: &mut usize) -> LayoutNode {
+    match node {
+        LayoutNode::Leaf(mut pane) => {
+            if *idx < services.len() {
+                let svc_id = services[*idx].clone();
+                *idx += 1;
+                pane.kind = PaneKind::Service(svc_id.clone());
+                pane.webview_label = format!("service-{}", svc_id);
+            }
+            LayoutNode::Leaf(pane)
+        }
+        LayoutNode::Split {
+            direction,
+            sizes,
+            children,
+        } => {
+            let new_children = children
+                .into_iter()
+                .map(|c| fill_services_recursive(c, services, idx))
+                .collect();
+            LayoutNode::Split {
+                direction,
+                sizes,
+                children: new_children,
+            }
+        }
     }
 }
 
@@ -498,9 +588,8 @@ mod tests {
         let tree = build_tree_from_state(&state);
         let rects = compute_rects(&tree, three_zone_viewport());
 
-        let tb = TITLE_BAR_HEIGHT;
-        let content_h = 900.0 - tb;
-
+        // Root V-Split (2 children) adds 1 divider: inner starts at y=32+4=36, h=900-32-4=864
+        // Inner H-Split (3 children) adds 2 dividers: service x=64+4=68, w=1400-64-400-8=928
         let chrome = rects.iter().find(|(id, _)| id.0 == "chrome").unwrap();
         let service = rects.iter().find(|(id, _)| id.0 == "service:svc1").unwrap();
         let ai = rects.iter().find(|(id, _)| id.0 == "ai").unwrap();
@@ -509,27 +598,27 @@ mod tests {
             chrome.1,
             Rect {
                 x: 0.0,
-                y: tb,
+                y: 36.0,
                 width: 64.0,
-                height: content_h
+                height: 864.0
             }
         );
         assert_eq!(
             service.1,
             Rect {
-                x: 64.0,
-                y: tb,
-                width: 936.0,
-                height: content_h
+                x: 68.0,
+                y: 36.0,
+                width: 928.0,
+                height: 864.0
             }
         );
         assert_eq!(
             ai.1,
             Rect {
                 x: 1000.0,
-                y: tb,
+                y: 36.0,
                 width: 400.0,
-                height: content_h
+                height: 864.0
             }
         );
     }
@@ -540,11 +629,12 @@ mod tests {
         let tree = build_tree_from_state(&state);
         let rects = compute_rects(&tree, three_zone_viewport());
 
+        // Inner H-Split (3 children): 2 dividers → service x=68, w=1400-64-0-8=1328
         let service = rects.iter().find(|(id, _)| id.0 == "service:svc1").unwrap();
         let ai = rects.iter().find(|(id, _)| id.0 == "ai").unwrap();
 
-        assert_eq!(service.1.x, 64.0);
-        assert_eq!(service.1.width, 1336.0);
+        assert_eq!(service.1.x, 68.0);
+        assert_eq!(service.1.width, 1328.0);
         assert_eq!(ai.1.width, 0.0);
     }
 
@@ -575,6 +665,7 @@ mod tests {
         };
         let rects = compute_rects(&node, vp);
 
+        // V-Split 2 children: divider=4 → each h=(600-4)/2=298, bot y=298+4=302
         let t = rects.iter().find(|(id, _)| id.0 == "top").unwrap();
         let b = rects.iter().find(|(id, _)| id.0 == "bot").unwrap();
         assert_eq!(
@@ -583,16 +674,16 @@ mod tests {
                 x: 0.0,
                 y: 0.0,
                 width: 800.0,
-                height: 300.0
+                height: 298.0
             }
         );
         assert_eq!(
             b.1,
             Rect {
                 x: 0.0,
-                y: 300.0,
+                y: 302.0,
                 width: 800.0,
-                height: 300.0
+                height: 298.0
             }
         );
     }
@@ -669,6 +760,7 @@ mod tests {
             height: 600.0,
         };
         let rects = compute_rects(&result, vp);
+        // H-Split 2 children: divider=4 → each w=(800-4)/2=398, r2 x=398+4=402
         let r1 = rects.iter().find(|(id, _)| id.0 == "root").unwrap();
         let r2 = rects.iter().find(|(id, _)| id.0 == "p2").unwrap();
         assert_eq!(
@@ -676,16 +768,16 @@ mod tests {
             Rect {
                 x: 0.0,
                 y: 0.0,
-                width: 400.0,
+                width: 398.0,
                 height: 600.0
             }
         );
         assert_eq!(
             r2.1,
             Rect {
-                x: 400.0,
+                x: 402.0,
                 y: 0.0,
-                width: 400.0,
+                width: 398.0,
                 height: 600.0
             }
         );
@@ -729,6 +821,8 @@ mod tests {
             height: 600.0,
         };
         let rects = compute_rects(&h, vp);
+        // H-Split 2 children: divider=4 → each w=(900-4)/2=448, right x=452
+        // V-Split 2 children: divider=4 → each h=(600-4)/2=298, bot y=302
         let ra = rects.iter().find(|(id, _)| id.0 == "a").unwrap();
         let rb = rects.iter().find(|(id, _)| id.0 == "b").unwrap();
         let rc = rects.iter().find(|(id, _)| id.0 == "c").unwrap();
@@ -737,25 +831,25 @@ mod tests {
             Rect {
                 x: 0.0,
                 y: 0.0,
-                width: 450.0,
-                height: 300.0
+                width: 448.0,
+                height: 298.0
             }
         );
         assert_eq!(
             rb.1,
             Rect {
                 x: 0.0,
-                y: 300.0,
-                width: 450.0,
-                height: 300.0
+                y: 302.0,
+                width: 448.0,
+                height: 298.0
             }
         );
         assert_eq!(
             rc.1,
             Rect {
-                x: 450.0,
+                x: 452.0,
                 y: 0.0,
-                width: 450.0,
+                width: 448.0,
                 height: 600.0
             }
         );
@@ -797,10 +891,12 @@ mod tests {
             height: 600.0,
         };
         let rects = compute_rects(&new_tree, vp);
+        // H-Split flex 2:1, divider=4 → remaining=896, a=2/3*896≈597.33, b=1/3*896≈298.67
         let ra = rects.iter().find(|(id, _)| id.0 == "a").unwrap();
         let rb = rects.iter().find(|(id, _)| id.0 == "b").unwrap();
-        assert!((ra.1.width - 600.0).abs() < 1.0);
-        assert!((rb.1.width - 300.0).abs() < 1.0);
+        // remaining = 900 - 4 = 896; a = 2/3*896 = 597.33, b = 1/3*896 = 298.67
+        assert!((ra.1.width - 597.33).abs() < 1.0);
+        assert!((rb.1.width - 298.67).abs() < 1.0);
     }
 
     #[test]
@@ -821,6 +917,80 @@ mod tests {
         assert_eq!(ids.len(), 2);
         assert!(ids.contains(&"svc1".to_string()));
         assert!(ids.contains(&"svc2".to_string()));
+    }
+
+    #[test]
+    fn compute_rects_accounts_for_divider() {
+        let node = LayoutNode::Split {
+            direction: SplitDirection::Horizontal,
+            sizes: vec![SplitSize::Flex(1.0), SplitSize::Flex(1.0)],
+            children: vec![make_leaf("l", "s1"), make_leaf("r", "s2")],
+        };
+        let vp = Rect {
+            x: 0.0,
+            y: 0.0,
+            width: 100.0,
+            height: 200.0,
+        };
+        let rects = compute_rects(&node, vp);
+        let l = rects.iter().find(|(id, _)| id.0 == "l").unwrap();
+        let r = rects.iter().find(|(id, _)| id.0 == "r").unwrap();
+        // (100 - 4) / 2 = 48 each; right starts at 48 + 4 = 52
+        assert!((l.1.width - 48.0).abs() < 0.1);
+        assert_eq!(l.1.x, 0.0);
+        assert!((r.1.x - 52.0).abs() < 0.1);
+        assert!((r.1.width - 48.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn build_tree_for_preset_2x2_structure() {
+        let tree = build_tree_for_preset(crate::state::LayoutPreset::TwoByTwo);
+        if let LayoutNode::Split {
+            direction,
+            children,
+            ..
+        } = &tree
+        {
+            assert_eq!(*direction, SplitDirection::Horizontal);
+            assert_eq!(children.len(), 2);
+            assert!(matches!(
+                &children[0],
+                LayoutNode::Split {
+                    direction: SplitDirection::Vertical,
+                    ..
+                }
+            ));
+            assert!(matches!(
+                &children[1],
+                LayoutNode::Split {
+                    direction: SplitDirection::Vertical,
+                    ..
+                }
+            ));
+        } else {
+            panic!("expected H-Split at root");
+        }
+        // All 4 leaves should be empty
+        assert_eq!(collect_service_ids(&tree).len(), 0);
+    }
+
+    #[test]
+    fn fill_preset_preserves_order() {
+        let tree = build_tree_for_preset(crate::state::LayoutPreset::TwoH);
+        let svc_ids = vec!["slack".to_string(), "gmail".to_string()];
+        let filled = fill_preset_with_services(tree, &svc_ids);
+        let ids = collect_service_ids(&filled);
+        assert_eq!(ids, vec!["slack".to_string(), "gmail".to_string()]);
+    }
+
+    #[test]
+    fn fill_preset_fewer_services_leaves_empties() {
+        let tree = build_tree_for_preset(crate::state::LayoutPreset::TwoByTwo);
+        let svc_ids = vec!["slack".to_string()];
+        let filled = fill_preset_with_services(tree, &svc_ids);
+        let ids = collect_service_ids(&filled);
+        assert_eq!(ids.len(), 1);
+        assert_eq!(ids[0], "slack");
     }
 
     #[test]

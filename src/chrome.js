@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { PresetPickerManager } from './PresetPickerManager.js';
 
 let services = [];
 let activeServiceId = null;
@@ -124,4 +125,8 @@ function setupListeners() {
   });
 }
 
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', () => {
+  init();
+  const presetPicker = new PresetPickerManager();
+  presetPicker.init('preset-picker');
+});
