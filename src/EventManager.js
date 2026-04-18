@@ -53,7 +53,7 @@ export class EventManager {
         const url = urlInput ? urlInput.value : '';
 
         this.hitotone.aiServices = await invoke('add_ai_service', {
-          service: { id: '', name, url, isDefault: false }
+          service: { id: '', name, url, isDefault: false },
         });
         this.hitotone.aiCompanionManager.renderDropdown();
 
@@ -67,7 +67,12 @@ export class EventManager {
     document.addEventListener('click', (e) => {
       const selector = document.getElementById('ai-selector');
       const dropdown = document.getElementById('ai-dropdown');
-      if (selector && dropdown && !selector.contains(e.target) && !dropdown.classList.contains('hidden')) {
+      if (
+        selector &&
+        dropdown &&
+        !selector.contains(e.target) &&
+        !dropdown.classList.contains('hidden')
+      ) {
         this.hitotone.aiCompanionManager.toggleDropdown(false);
       }
     });
@@ -77,6 +82,8 @@ export class EventManager {
     const addServiceBtn = document.getElementById('add-service-btn');
     if (addServiceBtn) {
       addServiceBtn.addEventListener('click', () => {
+        // Close settings first, then open add-service
+        this.hitotone.settingsManager.close();
         const modal = document.getElementById('add-service-modal');
         if (modal) this.hitotone.showModal(modal);
       });
@@ -93,11 +100,11 @@ export class EventManager {
     const presetBtns = document.querySelectorAll('.preset-service-btn');
     const submitPresetsBtn = document.getElementById('onboarding-submit-presets-btn');
 
-    presetBtns.forEach(btn => {
+    presetBtns.forEach((btn) => {
       btn.addEventListener('click', () => {
         btn.classList.toggle('selected');
         if (submitPresetsBtn) {
-          const anySelected = Array.from(presetBtns).some(b => b.classList.contains('selected'));
+          const anySelected = Array.from(presetBtns).some((b) => b.classList.contains('selected'));
           submitPresetsBtn.disabled = !anySelected;
         }
       });
@@ -106,7 +113,7 @@ export class EventManager {
     if (submitPresetsBtn) {
       submitPresetsBtn.addEventListener('click', async () => {
         submitPresetsBtn.disabled = true;
-        const selectedBtns = Array.from(presetBtns).filter(b => b.classList.contains('selected'));
+        const selectedBtns = Array.from(presetBtns).filter((b) => b.classList.contains('selected'));
         if (selectedBtns.length === 0) return;
 
         let firstNewServiceId = null;
@@ -117,22 +124,20 @@ export class EventManager {
           const icon = btn.dataset.presetIcon;
 
           this.hitotone.services = await invoke('add_service', {
-            service: { id: '', name, url, icon, enabled: true }
+            service: { id: '', name, url, icon, enabled: true },
           });
 
           const newService = this.hitotone.services[this.hitotone.services.length - 1];
           if (newService) {
             await invoke('create_service_webview', {
               serviceId: newService.id,
-              url: newService.url
+              url: newService.url,
             });
             if (!firstNewServiceId) {
               firstNewServiceId = newService.id;
             }
           }
         }
-
-        this.hitotone.serviceDockManager.render();
 
         const onboarding = document.getElementById('onboarding-screen');
         if (onboarding) this.hitotone.hideModal(onboarding);
@@ -142,7 +147,7 @@ export class EventManager {
         }
 
         // Reset selections
-        presetBtns.forEach(b => b.classList.remove('selected'));
+        presetBtns.forEach((b) => b.classList.remove('selected'));
         submitPresetsBtn.disabled = true;
       });
     }
@@ -166,19 +171,18 @@ export class EventManager {
         const iconInput = document.getElementById('service-icon');
         const name = nameInput ? nameInput.value : '';
         const url = urlInput ? urlInput.value : '';
-        const icon = iconInput ? (iconInput.value || '🔗') : '🔗';
+        const icon = iconInput ? iconInput.value || '🔗' : '🔗';
 
         this.hitotone.services = await invoke('add_service', {
-          service: { id: '', name, url, icon, enabled: true }
+          service: { id: '', name, url, icon, enabled: true },
         });
-        this.hitotone.serviceDockManager.render();
 
         // 新しいサービスのWebViewを作成
         const newService = this.hitotone.services[this.hitotone.services.length - 1];
         if (newService) {
           await invoke('create_service_webview', {
             serviceId: newService.id,
-            url: newService.url
+            url: newService.url,
           });
 
           // 初めてのサービス追加の場合、オンボーディングを隠してそのサービスに切り替え
@@ -215,13 +219,12 @@ export class EventManager {
         const id = idInput ? idInput.value : '';
         const name = nameInput ? nameInput.value : '';
         const url = urlInput ? urlInput.value : '';
-        const icon = iconInput ? (iconInput.value || '🔗') : '🔗';
+        const icon = iconInput ? iconInput.value || '🔗' : '🔗';
 
-        const service = this.hitotone.services.find(s => s.id === id);
+        const service = this.hitotone.services.find((s) => s.id === id);
         if (service) {
           const updatedService = { ...service, name, url, icon };
           this.hitotone.services = await invoke('update_service', { service: updatedService });
-          this.hitotone.serviceDockManager.render();
 
           // WebViewを再作成（URLが変わった可能性があるため）
           await invoke('remove_service_webview', { serviceId: id });
@@ -268,7 +271,7 @@ export class EventManager {
   }
 
   setupModalEvents() {
-    document.querySelectorAll('.modal').forEach(modal => {
+    document.querySelectorAll('.modal').forEach((modal) => {
       modal.addEventListener('click', (e) => {
         if (e.target === modal) {
           this.hitotone.hideModal(modal);
@@ -282,7 +285,7 @@ export class EventManager {
       // Cmd/Ctrl + 数字でサービス切り替え
       if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9') {
         const index = parseInt(e.key) - 1;
-        const enabledServices = this.hitotone.services.filter(s => s.enabled);
+        const enabledServices = this.hitotone.services.filter((s) => s.enabled);
         if (index < enabledServices.length) {
           this.hitotone.webViewManager.switchService(enabledServices[index].id);
         }
@@ -290,11 +293,10 @@ export class EventManager {
 
       // Escape でモーダルを閉じる
       if (e.key === 'Escape') {
-        document.querySelectorAll('.modal:not(.hidden)').forEach(modal => {
+        document.querySelectorAll('.modal:not(.hidden)').forEach((modal) => {
           this.hitotone.hideModal(modal);
         });
       }
-
     });
   }
 
@@ -302,7 +304,7 @@ export class EventManager {
     // バッジ更新をリッスン
     listen('badge-updated', (event) => {
       const { serviceId, count } = event.payload;
-      this.hitotone.serviceDockManager.updateBadge(serviceId, count);
+      this.hitotone.paneTreeManager.updateBadge(serviceId, count);
     });
 
     // AIに送るをリッスン
@@ -313,12 +315,6 @@ export class EventManager {
     // 認証完了時
     listen('auth-completed', (event) => {
       this.hitotone.webViewManager.navigateActiveWebview(event.payload);
-    });
-
-    // favicon更新をリッスン
-    listen('favicon-updated', (event) => {
-      const { serviceId, faviconUrl } = event.payload;
-      this.hitotone.serviceDockManager.updateServiceIcon(serviceId, faviconUrl);
     });
   }
 }

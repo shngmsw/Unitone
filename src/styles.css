@@ -94,14 +94,54 @@ body[data-theme="aurora"] {
 html,
 body {
   height: 100%;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background: var(--bg-gradient);
   background-attachment: fixed;
   color: var(--text-primary);
   overflow: hidden;
 }
 
-/* アプリヘッダー（ドラッグ可能） */
+/* タイトルバー（ドラッグ可能） */
+#titlebar {
+  height: 32px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+#app-title {
+  flex: 1;
+  padding-left: var(--space-md);
+  font-size: 12px;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+#titlebar-controls {
+  display: flex;
+}
+
+#titlebar-controls button {
+  width: 46px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s;
+}
+
+#titlebar-controls button:hover { background: rgba(255,255,255,0.1); color: #fff; }
+#tb-close:hover { background: #e81123 !important; color: #fff; }
+
+/* アプリヘッダー（ドラッグ可能） — legacy */
 #app-header {
   height: 32px;
   background: var(--bg-secondary);
@@ -208,7 +248,8 @@ body.platform-darwin #service-dock {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background-color var(--transition-normal),
+  transition:
+    background-color var(--transition-normal),
     transform var(--transition-fast),
     box-shadow var(--transition-normal);
   position: relative;
@@ -243,7 +284,7 @@ body.platform-darwin #service-dock {
 }
 
 .service-item.active::before {
-  content: '';
+  content: "";
   position: absolute;
   left: -8px;
   top: 50%;
@@ -257,7 +298,9 @@ body.platform-darwin #service-dock {
 /* Drag and drop styles */
 .service-item[draggable="true"] {
   cursor: grab;
-  transition: transform 0.15s ease, opacity 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    opacity 0.15s ease;
 }
 
 .service-item.dragging {
@@ -268,7 +311,7 @@ body.platform-darwin #service-dock {
 
 /* ドロップインジケーター - 上 */
 .service-item.drag-over-above::before {
-  content: '';
+  content: "";
   position: absolute;
   left: 4px;
   right: 4px;
@@ -281,7 +324,7 @@ body.platform-darwin #service-dock {
 
 /* ドロップインジケーター - 下 */
 .service-item.drag-over-below::after {
-  content: '';
+  content: "";
   position: absolute;
   left: 4px;
   right: 4px;
@@ -337,7 +380,8 @@ body.platform-darwin #service-dock {
   color: var(--text-secondary);
   font-size: 16px;
   cursor: pointer;
-  transition: background-color var(--transition-normal),
+  transition:
+    background-color var(--transition-normal),
     color var(--transition-normal),
     transform var(--transition-fast);
   box-shadow: var(--shadow-sm);
@@ -360,15 +404,14 @@ body.platform-darwin #service-dock {
   background: var(--bg-primary);
 }
 
+/* Pane tree overlay — headers float above service webviews (which start PANE_HEADER_HEIGHT below) */
 #webview-container {
-  width: 100%;
-  height: 100%;
-  position: relative;
-}
-
-/* WebView container - child webviews are managed by Tauri backend */
-#webview-container {
-  /* Tauri manages service webviews as child webviews */
+  position: absolute;
+  left: var(--dock-width);
+  top: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
 }
 
 /* SHIG #25 オブジェクトは自身の状態を体現する */
@@ -443,7 +486,9 @@ body.platform-darwin #service-dock {
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: background-color var(--transition-fast), transform var(--transition-fast);
+  transition:
+    background-color var(--transition-fast),
+    transform var(--transition-fast);
   box-shadow: var(--shadow-sm);
 }
 
@@ -509,7 +554,7 @@ body.platform-darwin #service-dock {
 }
 
 .preset-service-btn.selected::after {
-  content: '✓';
+  content: "✓";
   position: absolute;
   top: 4px;
   right: 8px;
@@ -576,7 +621,8 @@ body.platform-darwin #service-dock {
   border-left: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
-  transition: width var(--transition-slow),
+  transition:
+    width var(--transition-slow),
     opacity var(--transition-slow);
   position: relative;
   z-index: 20;
@@ -632,7 +678,7 @@ body.resizing-active iframe {
 }
 
 /* SHIG #60 エスケープハッチ - 閉じるボタンは常にアクセス可能 */
-#ai-header>button,
+#ai-header > button,
 #close-ai-btn {
   /* no-drag: interactive elements */
   background: none;
@@ -646,11 +692,12 @@ body.resizing-active iframe {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color var(--transition-fast),
+  transition:
+    background-color var(--transition-fast),
     color var(--transition-fast);
 }
 
-#ai-header>button:hover,
+#ai-header > button:hover,
 #close-ai-btn:hover {
   background: rgba(255, 255, 255, 0.1);
   color: var(--text-primary);
@@ -732,7 +779,9 @@ body.resizing-active iframe {
   border-radius: var(--radius-sm);
   font-size: 12px;
   opacity: 0;
-  transition: opacity var(--transition-fast), color var(--transition-fast);
+  transition:
+    opacity var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .ai-dropdown-item:hover .delete-ai-btn {
@@ -755,7 +804,9 @@ body.resizing-active iframe {
   font-size: 13px;
   cursor: pointer;
   text-align: left;
-  transition: background var(--transition-fast), color var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .dropdown-add-btn:hover {
@@ -886,7 +937,8 @@ body.resizing-active iframe {
   background: var(--bg-primary);
   color: var(--text-primary);
   font-size: 14px;
-  transition: border-color var(--transition-fast),
+  transition:
+    border-color var(--transition-fast),
     box-shadow var(--transition-fast);
   min-height: var(--btn-size);
 }
@@ -924,7 +976,8 @@ body.resizing-active iframe {
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  transition: background-color var(--transition-fast),
+  transition:
+    background-color var(--transition-fast),
     transform var(--transition-fast);
 }
 
@@ -1021,7 +1074,8 @@ body.resizing-active iframe {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color var(--transition-fast),
+  transition:
+    background-color var(--transition-fast),
     color var(--transition-fast);
 }
 
@@ -1138,4 +1192,205 @@ body.resizing-active iframe {
 
 #update-actions .update-btn-primary:hover {
   filter: brightness(1.1);
+}
+
+/* ========================================
+ * Phase 3/4 — Pane Tree
+ * ======================================== */
+
+.split {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+.split-horizontal {
+  flex-direction: row;
+}
+
+.split-vertical {
+  flex-direction: column;
+}
+
+.pane-wrapper {
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+.pane-header {
+  display: flex;
+  align-items: center;
+  padding: 0;
+  background: rgba(15, 20, 40, 0.85);
+  backdrop-filter: blur(4px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  pointer-events: all;
+  user-select: none;
+  flex-shrink: 0;
+  overflow: visible;
+  position: relative;
+}
+
+/* Focused pane: header gets accent tint + left border indicator */
+.pane-focused > .pane-header {
+  background: rgba(99, 179, 237, 0.12);
+  border-bottom-color: rgba(99, 179, 237, 0.3);
+}
+
+.pane-focused > .pane-header::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(99, 179, 237, 0.8);
+  border-radius: 0 1px 1px 0;
+}
+
+/* Service dropdown button fills the entire header */
+.pane-service-dropdown {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px 0 10px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  transition: background 0.12s;
+}
+
+.pane-service-dropdown:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.pane-dropdown-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.pane-dropdown-arrow {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.3);
+  flex-shrink: 0;
+}
+
+.pane-badge {
+  background: #e53e3e;
+  color: white;
+  border-radius: 9999px;
+  font-size: 8px;
+  font-weight: bold;
+  min-width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.pane-badge.hidden { display: none; }
+
+.pane-body {
+  flex: 1;
+  pointer-events: none;
+}
+
+/* Service picker dropdown menu */
+.service-picker-menu {
+  list-style: none;
+  background: #1e2a4a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  overflow: hidden;
+  padding: 4px 0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.service-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+  transition: background 0.1s;
+}
+
+.service-picker-item:hover {
+  background: rgba(99, 179, 237, 0.15);
+}
+
+.service-picker-item.current {
+  color: rgba(99, 179, 237, 1);
+}
+
+.service-picker-item.assigned {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.service-picker-item.assigned:hover {
+  background: transparent;
+}
+
+.picker-icon {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.picker-check {
+  margin-left: auto;
+  color: rgba(99, 179, 237, 0.9);
+  font-size: 12px;
+}
+
+/* Split dividers */
+.split-divider {
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.08);
+  transition: background 0.15s;
+  pointer-events: all;
+  z-index: 1;
+}
+
+.split-divider:hover,
+.split-divider:active {
+  background: rgba(100, 150, 255, 0.35);
+}
+
+.split-divider-h {
+  width: 4px;
+  cursor: ew-resize;
+}
+
+.split-divider-v {
+  height: 4px;
+  cursor: ns-resize;
 }

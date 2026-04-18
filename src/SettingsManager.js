@@ -53,7 +53,7 @@ export class SettingsManager {
 
     list.innerHTML = '';
 
-    this.hitotone.services.forEach(service => {
+    this.hitotone.services.forEach((service) => {
       const item = document.createElement('div');
       item.className = 'service-setting-item';
       item.innerHTML = `
@@ -73,7 +73,7 @@ export class SettingsManager {
     });
 
     // 編集ボタンのイベント
-    list.querySelectorAll('.edit-btn').forEach(btn => {
+    list.querySelectorAll('.edit-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         const serviceId = btn.dataset.serviceId;
         this.openEditService(serviceId);
@@ -81,25 +81,22 @@ export class SettingsManager {
     });
 
     // 削除ボタンのイベント
-    list.querySelectorAll('.delete-btn').forEach(btn => {
+    list.querySelectorAll('.delete-btn').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const serviceId = btn.dataset.serviceId;
         if (confirm('このサービスを削除しますか？')) {
           this.hitotone.services = await invoke('remove_service', { serviceId });
-          this.hitotone.serviceDockManager.render();
+          // serviceDockManager.render() 削除 (pane-tree-updated イベントで PaneTreeManager が自動更新)
 
-          // WebViewの削除もRust側で処理
           await invoke('remove_service_webview', { serviceId });
 
-          if (this.hitotone.activeServiceId === serviceId && this.hitotone.services.length > 0) {
-            await this.hitotone.webViewManager.switchService(this.hitotone.services[0].id);
-          } else if (this.hitotone.services.length === 0) {
-            // 全てのサービスが削除された場合はオンボーディングを表示
+          if (this.hitotone.services.length === 0) {
             this.hitotone.activeServiceId = null;
             const onboarding = document.getElementById('onboarding-screen');
             if (onboarding) this.hitotone.showModal(onboarding);
           }
 
+          await this.hitotone.paneTreeManager.refresh();
           this.open(); // リストを更新
         }
       });
@@ -112,7 +109,7 @@ export class SettingsManager {
   }
 
   openEditService(serviceId) {
-    const service = this.hitotone.services.find(s => s.id === serviceId);
+    const service = this.hitotone.services.find((s) => s.id === serviceId);
     if (!service) return;
 
     const idInput = document.getElementById('edit-service-id');

@@ -1,5 +1,13 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Space {
+    pub id: String,
+    pub name: String,
+    pub tree: LayoutNode,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Service {
@@ -51,18 +59,123 @@ pub struct AppState {
     pub show_ai_companion: bool,
     pub ai_width: u32,
     pub window_bounds: WindowBounds,
+    pub spaces: Vec<Space>,
+    pub active_space_id: String,
     #[serde(skip)]
     pub badge_counts: HashMap<String, u32>,
-    /// Labels of currently created service webviews
     #[serde(skip)]
     pub created_webview_labels: Vec<String>,
-    /// Whether AI webview has been created
     #[serde(skip)]
     pub ai_webview_created: bool,
+    /// Runtime cache of the active space's tree. Sync to spaces on every mutation.
+    #[serde(skip)]
+    pub service_tree: Arc<LayoutNode>,
+    #[serde(skip)]
+    pub focused_pane_id: Option<PaneId>,
+}
+
+impl AppState {
+    /// Sync the runtime service_tree back into the active space's tree.
+    pub fn sync_tree_to_active_space(&mut self) {
+        let tree = self.service_tree.as_ref().clone();
+        let id = self.active_space_id.clone();
+        if let Some(space) = self.spaces.iter_mut().find(|s| s.id == id) {
+            space.tree = tree;
+        }
+    }
+
+    /// Load the active space's tree into service_tree.
+    pub fn load_active_space_tree(&mut self) {
+        let id = self.active_space_id.clone();
+        if let Some(space) = self.spaces.iter().find(|s| s.id == id) {
+            self.service_tree = Arc::new(space.tree.clone());
+            self.focused_pane_id = crate::layout::first_pane_id(&space.tree);
+        }
+    }
+}
+
+// ========================================
+// Layout tree types (Phase 2 foundation)
+// ========================================
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct PaneId(pub String);
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PaneKind {
+    Chrome,
+    Service(String),
+    AiCompanion,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Pane {
+    pub id: PaneId,
+    pub kind: PaneKind,
+    pub webview_label: String,
+    pub visible: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SplitDirection {
+    Horizontal,
+    Vertical,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum SplitSize {
+    Fixed(f32),
+    Flex(f32),
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LayoutPreset {
+    Single,
+    TwoH,
+    TwoV,
+    TwoByTwo,
+    ThreeH,
+    FourH,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum LayoutNode {
+    Leaf(Pane),
+    Split {
+        direction: SplitDirection,
+        sizes: Vec<SplitSize>,
+        children: Vec<LayoutNode>,
+    },
+}
+
+pub type LayoutTree = Arc<LayoutNode>;
+
+impl Default for LayoutNode {
+    fn default() -> Self {
+        LayoutNode::Leaf(Pane {
+            id: PaneId("root".into()),
+            kind: PaneKind::Service(String::new()),
+            webview_label: String::new(),
+            visible: true,
+        })
+    }
 }
 
 impl Default for AppState {
     fn default() -> Self {
+        let root_id = PaneId("root".into());
+        let default_tree = LayoutNode::Leaf(Pane {
+            id: root_id.clone(),
+            kind: PaneKind::Service(String::new()),
+            webview_label: String::new(),
+            visible: true,
+        });
+        let default_space = Space {
+            id: "space-1".to_string(),
+            name: "スペース 1".to_string(),
+            tree: default_tree.clone(),
+        };
         Self {
             services: Vec::new(),
             ai_services: vec![
@@ -90,9 +203,13 @@ impl Default for AppState {
             show_ai_companion: true,
             ai_width: 400,
             window_bounds: WindowBounds::default(),
+            spaces: vec![default_space],
+            active_space_id: "space-1".to_string(),
             badge_counts: HashMap::new(),
             created_webview_labels: Vec::new(),
             ai_webview_created: false,
+            service_tree: Arc::new(default_tree),
+            focused_pane_id: Some(root_id),
         }
     }
 }
